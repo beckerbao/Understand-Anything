@@ -122,11 +122,9 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 
 ### OpenCode
 
-`opencode.json` に以下を追加：
-```json
-{
-  "plugin": ["understand-anything@git+https://github.com/Lum1104/Understand-Anything.git"]
-}
+OpenCodeに以下を伝えてください：
+```
+Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
 ```
 
 ### OpenClaw
@@ -153,7 +151,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 |----------|--------|----------------|
 | Claude Code | ✅ ネイティブ | プラグインマーケットプレイス |
 | Codex | ✅ サポート | AI駆動インストール |
-| OpenCode | ✅ サポート | プラグイン設定 |
+| OpenCode | ✅ サポート | AI駆動インストール |
 | OpenClaw | ✅ サポート | AI駆動インストール |
 | Cursor | ✅ サポート | 自動検出 |
 | Antigravity | ✅ サポート | AI駆動インストール |

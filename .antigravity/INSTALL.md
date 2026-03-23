@@ -11,16 +11,20 @@
    git clone https://github.com/Lum1104/Understand-Anything.git ~/.antigravity/understand-anything
    ```
 
-2. **Create the skills symlink:**
+2. **Create the skills symlinks:**
    ```bash
    mkdir -p ~/.gemini/antigravity/skills
    ln -s ~/.antigravity/understand-anything/understand-anything-plugin/skills ~/.gemini/antigravity/skills/understand-anything
+   # Universal plugin root symlink — lets the dashboard skill find packages/dashboard/
+   # Skip if already exists (e.g. another platform was installed first)
+   [ -e ~/.understand-anything-plugin ] || [ -L ~/.understand-anything-plugin ] || ln -s ~/.antigravity/understand-anything/understand-anything-plugin ~/.understand-anything-plugin
    ```
 
    **Windows (PowerShell):**
    ```powershell
    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\antigravity\skills"
    cmd /c mklink /J "$env:USERPROFILE\.gemini\antigravity\skills\understand-anything" "$env:USERPROFILE\.antigravity\understand-anything\understand-anything-plugin\skills"
+   cmd /c mklink /J "$env:USERPROFILE\.understand-anything-plugin" "$env:USERPROFILE\.antigravity\understand-anything\understand-anything-plugin"
    ```
 
 3. **Restart the chat or IDE** so Antigravity can discover the skills.
@@ -52,5 +56,6 @@ Skills update instantly through the symlink.
 
 ```bash
 rm ~/.gemini/antigravity/skills/understand-anything
+rm ~/.understand-anything-plugin
 rm -rf ~/.antigravity/understand-anything
 ```

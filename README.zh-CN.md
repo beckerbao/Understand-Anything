@@ -121,11 +121,9 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 
 ### OpenCode
 
-添加到你的 `opencode.json` 文件:
-```json
-{
-  "plugin": ["understand-anything@git+https://github.com/Lum1104/Understand-Anything.git"]
-}
+告诉 OpenCode:
+```
+Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
 ```
 
 ### OpenClaw
@@ -152,7 +150,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 |----------|--------|----------------|
 | Claude Code | ✅ Native | 插件市场 |
 | Codex | ✅ 支持 | AI驱动安装 |
-| OpenCode | ✅ 支持 | 插件配置 |
+| OpenCode | ✅ 支持 | AI驱动安装 |
 | OpenClaw | ✅ 支持 | AI驱动安装 |
 | Cursor | ✅ 支持 | 自动发现 |
 | Antigravity | ✅ 支持 | AI驱动安装 |

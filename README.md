@@ -122,11 +122,9 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 
 ### OpenCode
 
-Add to your `opencode.json`:
-```json
-{
-  "plugin": ["understand-anything@git+https://github.com/Lum1104/Understand-Anything.git"]
-}
+Tell OpenCode:
+```
+Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
 ```
 
 ### OpenClaw
@@ -153,7 +151,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 |----------|--------|----------------|
 | Claude Code | ✅ Native | Plugin marketplace |
 | Codex | ✅ Supported | AI-driven install |
-| OpenCode | ✅ Supported | Plugin config |
+| OpenCode | ✅ Supported | AI-driven install |
 | OpenClaw | ✅ Supported | AI-driven install |
 | Cursor | ✅ Supported | Auto-discovery |
 | Antigravity | ✅ Supported | AI-driven install |
