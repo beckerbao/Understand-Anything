@@ -444,6 +444,11 @@ function GraphViewInner() {
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        edgesFocusable={false}
+        edgesReconnectable={false}
+        elementsSelectable={false}
         fitView
         fitViewOptions={{ minZoom: 0.01, padding: 0.1 }}
         minZoom={0.01}

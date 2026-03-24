@@ -80,8 +80,7 @@ function CustomNodeComponent({
 
   return (
     <div
-      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} min-w-[180px] max-w-[220px] overflow-hidden transition-all duration-200 cursor-pointer`}
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} min-w-[180px] max-w-[220px] overflow-hidden transition-[box-shadow,outline,opacity,filter] duration-200 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3)]`}
       onClick={() => data.onNodeClick?.(id)}
     >
       {/* Left color bar */}
