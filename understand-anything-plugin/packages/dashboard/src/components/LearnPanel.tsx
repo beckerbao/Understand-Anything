@@ -122,16 +122,16 @@ export default function LearnPanel() {
                 <p className="mb-1.5 last:mb-0">{children}</p>
               ),
               strong: ({ children }) => (
-                <strong className="font-semibold text-white">{children}</strong>
+                <strong className="font-semibold text-text-primary">{children}</strong>
               ),
               code: ({ className, children }) => {
                 const isBlock = className?.includes("language-");
                 return isBlock ? (
-                  <code className="block bg-gray-900 rounded px-2 py-1.5 mb-1.5 overflow-x-auto text-[11px] leading-relaxed">
+                  <code className="block bg-elevated rounded px-2 py-1.5 mb-1.5 overflow-x-auto text-[11px] leading-relaxed">
                     {children}
                   </code>
                 ) : (
-                  <code className="bg-gray-900 rounded px-1 py-0.5 text-[11px]">
+                  <code className="bg-elevated rounded px-1 py-0.5 text-[11px]">
                     {children}
                   </code>
                 );

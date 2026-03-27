@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import CustomNode from "./CustomNode";
 import type { CustomFlowNode } from "./CustomNode";
 import { useDashboardStore } from "../store";
+import { useTheme } from "../themes/index.ts";
 import { applyDagreLayout, applyDagreLayoutAsync, NODE_WIDTH, NODE_HEIGHT } from "../utils/layout";
 
 const LAYER_PADDING = 40;
@@ -153,8 +154,8 @@ function buildTopologyData(
       style: isImpacted
         ? {
             stroke: sourceInDiff && targetInDiff
-              ? "rgba(224, 82, 82, 0.7)"
-              : "rgba(212, 160, 48, 0.5)",
+              ? "var(--color-diff-changed)"
+              : "var(--color-diff-affected)",
             strokeWidth: 2.5,
           }
         : diffMode
@@ -309,6 +310,7 @@ function GraphViewInner() {
   const diffMode = useDashboardStore((s) => s.diffMode);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
+  const { preset } = useTheme();
 
   const [layouting, setLayouting] = useState(false);
 
@@ -453,7 +455,7 @@ function GraphViewInner() {
         fitViewOptions={{ minZoom: 0.01, padding: 0.1 }}
         minZoom={0.01}
         maxZoom={2}
-        colorMode="dark"
+        colorMode={preset.isDark ? "dark" : "light"}
       >
         <Background variant={BackgroundVariant.Dots} color="var(--color-edge-dot)" gap={20} size={1} />
         <Controls />
