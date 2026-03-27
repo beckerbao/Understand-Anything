@@ -47,7 +47,7 @@ export default function LayerLegend() {
         disabled={!hasLayers}
         className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
           showLayers && hasLayers
-            ? "bg-gold/20 text-gold"
+            ? "bg-accent/20 text-accent"
             : hasLayers
               ? "bg-elevated text-text-secondary hover:bg-surface"
               : "bg-elevated text-text-muted cursor-not-allowed"

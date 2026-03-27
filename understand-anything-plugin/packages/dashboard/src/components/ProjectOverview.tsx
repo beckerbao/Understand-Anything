@@ -30,19 +30,19 @@ export default function ProjectOverview() {
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-elevated rounded-lg p-3 border border-border-subtle">
-          <div className="text-2xl font-mono font-medium text-gold">{nodes.length}</div>
+          <div className="text-2xl font-mono font-medium text-accent">{nodes.length}</div>
           <div className="text-[11px] text-text-muted uppercase tracking-wider mt-1">Nodes</div>
         </div>
         <div className="bg-elevated rounded-lg p-3 border border-border-subtle">
-          <div className="text-2xl font-mono font-medium text-gold">{edges.length}</div>
+          <div className="text-2xl font-mono font-medium text-accent">{edges.length}</div>
           <div className="text-[11px] text-text-muted uppercase tracking-wider mt-1">Edges</div>
         </div>
         <div className="bg-elevated rounded-lg p-3 border border-border-subtle">
-          <div className="text-2xl font-mono font-medium text-gold">{layers.length}</div>
+          <div className="text-2xl font-mono font-medium text-accent">{layers.length}</div>
           <div className="text-[11px] text-text-muted uppercase tracking-wider mt-1">Layers</div>
         </div>
         <div className="bg-elevated rounded-lg p-3 border border-border-subtle">
-          <div className="text-2xl font-mono font-medium text-gold">{Object.keys(typeCounts).length}</div>
+          <div className="text-2xl font-mono font-medium text-accent">{Object.keys(typeCounts).length}</div>
           <div className="text-[11px] text-text-muted uppercase tracking-wider mt-1">Types</div>
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function ProjectOverview() {
       {/* Languages */}
       {project.languages.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">Languages</h3>
+          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">Languages</h3>
           <div className="flex flex-wrap gap-1.5">
             {project.languages.map((lang) => (
               <span key={lang} className="text-[11px] glass text-text-secondary px-2.5 py-1 rounded-full">
@@ -64,7 +64,7 @@ export default function ProjectOverview() {
       {/* Frameworks */}
       {project.frameworks.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">Frameworks</h3>
+          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">Frameworks</h3>
           <div className="flex flex-wrap gap-1.5">
             {project.frameworks.map((fw) => (
               <span key={fw} className="text-[11px] glass text-text-secondary px-2.5 py-1 rounded-full">
@@ -84,7 +84,7 @@ export default function ProjectOverview() {
       {hasTour && (
         <button
           onClick={startTour}
-          className="w-full bg-gold/10 border border-gold/30 text-gold text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-gold/20 transition-all duration-200"
+          className="w-full bg-accent/10 border border-accent/30 text-accent text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-accent/20 transition-all duration-200"
         >
           Start Guided Tour
         </button>

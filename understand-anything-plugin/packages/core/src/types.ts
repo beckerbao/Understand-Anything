@@ -66,12 +66,19 @@ export interface KnowledgeGraph {
   tour: TourStep[];
 }
 
+// Theme configuration (for dashboard customization)
+export interface ThemeConfig {
+  presetId: string;
+  accentId: string;
+}
+
 // AnalysisMeta (for persistence)
 export interface AnalysisMeta {
   lastAnalyzedAt: string;
   gitCommitHash: string;
   version: string;
   analyzedFiles: number;
+  theme?: ThemeConfig;
 }
 
 // Plugin interfaces

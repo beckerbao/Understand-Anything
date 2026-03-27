@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import CustomNode from "./CustomNode";
 import type { CustomFlowNode } from "./CustomNode";
 import { useDashboardStore } from "../store";
+import { useTheme } from "../themes/index.ts";
 import { applyDagreLayout, applyDagreLayoutAsync, NODE_WIDTH, NODE_HEIGHT } from "../utils/layout";
 
 const LAYER_PADDING = 40;
@@ -153,16 +154,16 @@ function buildTopologyData(
       style: isImpacted
         ? {
             stroke: sourceInDiff && targetInDiff
-              ? "rgba(224, 82, 82, 0.7)"
-              : "rgba(212, 160, 48, 0.5)",
+              ? "var(--color-diff-changed)"
+              : "var(--color-diff-affected)",
             strokeWidth: 2.5,
           }
         : diffMode
-          ? { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }
-          : { stroke: "rgba(212,165,116,0.3)", strokeWidth: 1.5 },
+          ? { stroke: "var(--color-edge-dim)", strokeWidth: 1 }
+          : { stroke: "var(--color-edge)", strokeWidth: 1.5 },
       labelStyle: diffMode && !isImpacted
-        ? { fill: "rgba(163,151,135,0.3)", fontSize: 10 }
-        : { fill: "#a39787", fontSize: 10 },
+        ? { fill: "var(--color-text-muted)", fontSize: 10 }
+        : { fill: "var(--color-text-secondary)", fontSize: 10 },
     };
   });
 
@@ -262,13 +263,13 @@ function applyLayerGroups(
       style: {
         width: groupWidth,
         height: groupHeight,
-        backgroundColor: "rgba(212,165,116,0.05)",
+        backgroundColor: "var(--color-accent-overlay-bg)",
         borderRadius: 12,
-        border: "2px dashed rgba(212,165,116,0.25)",
+        border: "2px dashed var(--color-accent-overlay-border)",
         padding: 8,
         fontSize: 13,
         fontWeight: 600,
-        color: "#d4a574",
+        color: "var(--color-accent)",
       },
     });
 
@@ -309,6 +310,7 @@ function GraphViewInner() {
   const diffMode = useDashboardStore((s) => s.diffMode);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
+  const { preset } = useTheme();
 
   const [layouting, setLayouting] = useState(false);
 
@@ -429,7 +431,7 @@ function GraphViewInner() {
       {layouting && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-root/80 rounded-lg">
           <div className="text-center">
-            <div className="inline-block w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin mb-3" />
+            <div className="inline-block w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
             <p className="text-text-secondary text-sm">
               Laying out {topoNodes.length.toLocaleString()} nodes...
             </p>
@@ -453,13 +455,13 @@ function GraphViewInner() {
         fitViewOptions={{ minZoom: 0.01, padding: 0.1 }}
         minZoom={0.01}
         maxZoom={2}
-        colorMode="dark"
+        colorMode={preset.isDark ? "dark" : "light"}
       >
-        <Background variant={BackgroundVariant.Dots} color="rgba(212,165,116,0.15)" gap={20} size={1} />
+        <Background variant={BackgroundVariant.Dots} color="var(--color-edge-dot)" gap={20} size={1} />
         <Controls />
         <MiniMap
-          nodeColor="#1a1a1a"
-          maskColor="rgba(10,10,10,0.7)"
+          nodeColor="var(--color-elevated)"
+          maskColor="var(--glass-bg)"
           className="!bg-surface !border !border-border-subtle"
         />
         <TourFitView />
