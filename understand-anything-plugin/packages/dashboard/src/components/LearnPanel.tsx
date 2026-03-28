@@ -47,13 +47,13 @@ export default function LearnPanel() {
 
         <button
           onClick={startTour}
-          className="w-full mb-4 bg-gold/10 border border-gold/30 text-gold text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-gold/20 transition-colors"
+          className="w-full mb-4 bg-accent/10 border border-accent/30 text-accent text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-accent/20 transition-colors"
         >
           Start Tour
         </button>
 
         <div className="space-y-2">
-          <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">
+          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
             Steps
           </h3>
           {tourSteps.map((step, i) => (
@@ -61,7 +61,7 @@ export default function LearnPanel() {
               key={step.order}
               className="flex items-start gap-2 text-xs bg-elevated rounded-lg px-3 py-2 border border-border-subtle"
             >
-              <span className="text-gold font-mono shrink-0 mt-0.5">
+              <span className="text-accent font-mono shrink-0 mt-0.5">
                 {i + 1}.
               </span>
               <span className="text-text-secondary">{step.title}</span>
@@ -86,7 +86,7 @@ export default function LearnPanel() {
       {/* Header with progress counter and exit */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider">
+          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">
             Tour
           </h3>
           <span className="text-xs text-text-muted">
@@ -104,7 +104,7 @@ export default function LearnPanel() {
       {/* Progress bar */}
       <div className="h-1 bg-elevated shrink-0">
         <div
-          className="h-full bg-gold transition-all duration-300"
+          className="h-full bg-accent transition-all duration-300"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -122,16 +122,16 @@ export default function LearnPanel() {
                 <p className="mb-1.5 last:mb-0">{children}</p>
               ),
               strong: ({ children }) => (
-                <strong className="font-semibold text-white">{children}</strong>
+                <strong className="font-semibold text-text-primary">{children}</strong>
               ),
               code: ({ className, children }) => {
                 const isBlock = className?.includes("language-");
                 return isBlock ? (
-                  <code className="block bg-gray-900 rounded px-2 py-1.5 mb-1.5 overflow-x-auto text-[11px] leading-relaxed">
+                  <code className="block bg-elevated rounded px-2 py-1.5 mb-1.5 overflow-x-auto text-[11px] leading-relaxed">
                     {children}
                   </code>
                 ) : (
-                  <code className="bg-gray-900 rounded px-1 py-0.5 text-[11px]">
+                  <code className="bg-elevated rounded px-1 py-0.5 text-[11px]">
                     {children}
                   </code>
                 );
@@ -154,8 +154,8 @@ export default function LearnPanel() {
 
         {/* Language lesson */}
         {step.languageLesson && (
-          <div className="bg-gold/5 border border-gold/20 rounded p-3 mb-4">
-            <h4 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-1.5">
+          <div className="bg-accent/5 border border-accent/20 rounded p-3 mb-4">
+            <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-1.5">
               Language Lesson
             </h4>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -167,7 +167,7 @@ export default function LearnPanel() {
         {/* Referenced component pills */}
         {step.nodeIds.length > 0 && (
           <div className="mb-4">
-            <h4 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">
+            <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
               Referenced Components
             </h4>
             <div className="flex flex-wrap gap-1.5">
@@ -198,7 +198,7 @@ export default function LearnPanel() {
               onClick={() => setTourStep(i)}
               className={`w-2 h-2 rounded-full transition-colors ${
                 i === currentTourStep
-                  ? "bg-gold"
+                  ? "bg-accent"
                   : "bg-elevated hover:bg-surface"
               }`}
               aria-label={`Go to step ${i + 1}`}
@@ -217,7 +217,7 @@ export default function LearnPanel() {
           </button>
           <button
             onClick={isLast ? stopTour : nextTourStep}
-            className="flex-1 text-xs bg-gold/10 border border-gold/30 text-gold py-1.5 rounded-lg hover:bg-gold/20 transition-colors"
+            className="flex-1 text-xs bg-accent/10 border border-accent/30 text-accent py-1.5 rounded-lg hover:bg-accent/20 transition-colors"
           >
             {isLast ? "Finish" : "Next"}
           </button>

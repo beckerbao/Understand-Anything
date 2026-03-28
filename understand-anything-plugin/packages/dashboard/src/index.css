@@ -1,46 +1,77 @@
 @import "tailwindcss";
 
 @theme {
-  /* Dark luxury color palette */
+  /* Base */
   --color-root: #0a0a0a;
   --color-surface: #111111;
   --color-elevated: #1a1a1a;
   --color-panel: #141414;
 
-  /* Gold accent spectrum */
-  --color-gold: #d4a574;
-  --color-gold-dim: #c9a96e;
-  --color-gold-bright: #e8c49a;
+  /* Accent */
+  --color-accent: #d4a574;
+  --color-accent-dim: #c9a96e;
+  --color-accent-bright: #e8c49a;
 
-  /* Text hierarchy */
+  /* Text */
   --color-text-primary: #f5f0eb;
   --color-text-secondary: #a39787;
   --color-text-muted: #6b5f53;
 
-  /* Border tokens */
+  /* Borders */
   --color-border-subtle: rgba(212, 165, 116, 0.12);
   --color-border-medium: rgba(212, 165, 116, 0.25);
 
-  /* Node type colors (muted, refined) */
+  /* Node types */
   --color-node-file: #4a7c9b;
   --color-node-function: #5a9e6f;
   --color-node-class: #8b6fb0;
   --color-node-module: #c9a06c;
   --color-node-concept: #b07a8a;
 
-  /* Diff overlay colors */
+  /* Diff */
   --color-diff-changed: #e05252;
   --color-diff-affected: #d4a030;
   --color-diff-changed-dim: rgba(224, 82, 82, 0.25);
   --color-diff-affected-dim: rgba(212, 160, 48, 0.25);
 
-  /* Fonts */
+  /* Glass */
+  --glass-bg: rgba(20, 20, 20, 0.8);
+  --glass-bg-heavy: rgba(20, 20, 20, 0.95);
+  --glass-border: rgba(212, 165, 116, 0.1);
+  --glass-border-heavy: rgba(212, 165, 116, 0.15);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(212, 165, 116, 0.2);
+  --scrollbar-thumb-hover: rgba(212, 165, 116, 0.35);
+
+  /* Glow */
+  --glow-accent: rgba(212, 165, 116, 0.15);
+  --glow-accent-strong: rgba(212, 165, 116, 0.4);
+  --glow-accent-pulse: rgba(212, 165, 116, 0.6);
+
+  /* Edges */
+  --color-edge: rgba(212, 165, 116, 0.3);
+  --color-edge-dim: rgba(212, 165, 116, 0.08);
+  --color-edge-dot: rgba(212, 165, 116, 0.15);
+
+  /* Accent overlays */
+  --color-accent-overlay-bg: rgba(212, 165, 116, 0.05);
+  --color-accent-overlay-border: rgba(212, 165, 116, 0.25);
+
+  /* Kbd */
+  --kbd-bg: rgba(212, 165, 116, 0.1);
+
+  /* Typography */
   --font-serif: 'DM Serif Display', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
 /* Base styles */
+html {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-root);
@@ -65,15 +96,15 @@ body {
 
 /* Glass utility */
 .glass {
-  background: rgba(20, 20, 20, 0.8);
-  border: 1px solid rgba(212, 165, 116, 0.1);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .glass-heavy {
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid rgba(212, 165, 116, 0.15);
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--glass-border-heavy);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -89,11 +120,11 @@ body {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-gold);
-  background: rgba(212, 165, 116, 0.1);
-  border: 1px solid rgba(212, 165, 116, 0.3);
+  color: var(--color-accent);
+  background: var(--kbd-bg);
+  border: 1px solid var(--color-border-medium);
   border-radius: 0.25rem;
-  box-shadow: 0 1px 0 rgba(212, 165, 116, 0.2);
+  box-shadow: 0 1px 0 var(--scrollbar-thumb);
 }
 
 /* Animation keyframes */
@@ -117,12 +148,12 @@ body {
   }
 }
 
-@keyframes goldPulse {
+@keyframes accentPulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(212, 165, 116, 0.4);
+    box-shadow: 0 0 8px var(--glow-accent-strong);
   }
   50% {
-    box-shadow: 0 0 20px 4px rgba(212, 165, 116, 0.15);
+    box-shadow: 0 0 20px var(--glow-accent-pulse);
   }
 }
 
@@ -135,13 +166,13 @@ body {
   animation: slideUp 0.3s ease-out forwards;
 }
 
-.animate-gold-pulse {
-  animation: goldPulse 2s ease-in-out infinite;
+.animate-accent-pulse {
+  animation: accentPulse 2s ease-in-out infinite;
 }
 
 /* Node selection glow */
 .node-glow {
-  box-shadow: 0 0 20px rgba(212, 165, 116, 0.15);
+  box-shadow: 0 0 20px var(--glow-accent);
 }
 
 /* Diff overlay glow effects */
@@ -169,14 +200,37 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(212, 165, 116, 0.2);
-  border-radius: 3px;
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 165, 116, 0.35);
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Override React Flow dark theme */
 .react-flow__background {
   background-color: var(--color-root) !important;
+}
+
+/* Light theme overrides */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="light"] .diff-faded {
+  opacity: 0.35;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .warning-banner {
+  background: rgba(180, 130, 30, 0.1);
+  border-color: rgba(180, 130, 30, 0.3);
+  color: #92600a;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
 }

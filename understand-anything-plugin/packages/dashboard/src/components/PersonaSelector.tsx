@@ -32,7 +32,7 @@ export default function PersonaSelector() {
           title={p.description}
           className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
             persona === p.id
-              ? "bg-gold/20 text-gold"
+              ? "bg-accent/20 text-accent"
               : "text-text-muted hover:text-text-secondary hover:bg-surface"
           }`}
         >

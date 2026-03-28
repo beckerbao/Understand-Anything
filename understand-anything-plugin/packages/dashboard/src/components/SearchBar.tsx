@@ -94,14 +94,14 @@ export default function SearchBar() {
           onChange={handleInputChange}
           onFocus={() => setDropdownOpen(true)}
           placeholder="Search nodes by name, summary, or tags..."
-          className="flex-1 bg-elevated text-text-primary text-sm rounded-lg px-3 py-1.5 border border-border-subtle focus:outline-none focus:border-gold/50 placeholder-text-muted"
+          className="flex-1 bg-elevated text-text-primary text-sm rounded-lg px-3 py-1.5 border border-border-subtle focus:outline-none focus:border-accent/50 placeholder-text-muted"
         />
         <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
           <button
             onClick={() => setSearchMode("fuzzy")}
             className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
               searchMode === "fuzzy"
-                ? "bg-gold/20 text-gold"
+                ? "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text-secondary"
             }`}
           >
@@ -111,7 +111,7 @@ export default function SearchBar() {
             onClick={() => setSearchMode("semantic")}
             className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
               searchMode === "semantic"
-                ? "bg-gold/20 text-gold"
+                ? "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text-secondary"
             }`}
           >
@@ -159,7 +159,7 @@ export default function SearchBar() {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <div className="w-16 h-1.5 bg-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gold rounded-full"
+                      className="h-full bg-accent rounded-full"
                       style={{ width: `${relevance}%` }}
                     />
                   </div>

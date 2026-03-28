@@ -11,7 +11,7 @@ const typeBadgeColors: Record<string, string> = {
 
 const complexityBadgeColors: Record<string, string> = {
   simple: "text-node-function border border-node-function/30 bg-node-function/10",
-  moderate: "text-gold-dim border border-gold-dim/30 bg-gold-dim/10",
+  moderate: "text-accent-dim border border-accent-dim/30 bg-accent-dim/10",
   complex: "text-[#c97070] border border-[#c97070]/30 bg-[#c97070]/10",
 };
 
@@ -212,7 +212,7 @@ export default function NodeInfo() {
         <div className="mb-4">
           <button
             onClick={() => setLanguageExpanded(!languageExpanded)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-gold uppercase tracking-wider mb-2 hover:text-gold-bright transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-accent uppercase tracking-wider mb-2 hover:text-accent-bright transition-colors"
           >
             <svg
               className={`w-3 h-3 transition-transform ${languageExpanded ? "rotate-90" : ""}`}
@@ -225,7 +225,7 @@ export default function NodeInfo() {
             Language Concepts
           </button>
           {languageExpanded && (
-            <div className="bg-gold/5 border border-gold/20 rounded-lg p-3">
+            <div className="bg-accent/5 border border-accent/20 rounded-lg p-3">
               <p className="text-sm text-text-secondary leading-relaxed">
                 {node.languageNotes}
               </p>
@@ -236,7 +236,7 @@ export default function NodeInfo() {
 
       {node.tags.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">
+          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
             Tags
           </h3>
           <div className="flex flex-wrap gap-1.5">

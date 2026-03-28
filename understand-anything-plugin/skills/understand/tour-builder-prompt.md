@@ -20,13 +20,13 @@ Write a Node.js script that analyzes the graph's topology to surface structural 
    ```json
    {
      "nodes": [
-       {"id": "file:src/index.ts", "type": "file", "name": "index.ts", "filePath": "src/index.ts", "summary": "...", "tags": ["entry-point"]}
+       {"id": "file:src/index.ts", "type": "file", "name": "index.ts", "filePath": "src/index.ts", "summary": "..."}
      ],
      "edges": [
        {"source": "file:src/index.ts", "target": "file:src/utils.ts", "type": "imports"}
      ],
      "layers": [
-       {"id": "layer:core", "name": "Core", "nodeIds": ["file:src/index.ts"]}
+       {"id": "layer:core", "name": "Core", "description": "Core application logic"}
      ]
    }
    ```
@@ -47,7 +47,6 @@ For every node, count how many other nodes it has edges pointing TO (fan-out). H
 
 Identify likely entry points using these signals (score each file node, sum the scores):
 - Filename matches `index.ts`, `index.js`, `main.ts`, `main.js`, `app.ts`, `app.js`, `server.ts`, `server.js`, `mod.rs`, `main.go`, `main.py`, `main.rs`, `manage.py`, `app.py`, `wsgi.py`, `asgi.py`, `run.py`, `__main__.py`, `Application.java`, `Main.java`, `Program.cs`, `config.ru`, `index.php`, `App.swift`, `Application.kt`, `main.cpp`, `main.c` -> +3 points
-- Node tags contain `entry-point` or `barrel` -> +2 points
 - File is at the project root or one level deep (e.g., `src/index.ts`) -> +1 point
 - High fan-out (top 10%) -> +1 point
 - Low fan-in (bottom 25%) -> +1 point (entry points are imported by few files)
@@ -71,17 +70,15 @@ Algorithm: For each pair of nodes with a bidirectional relationship (A imports B
 
 Output the top 5-10 clusters, each as a list of node IDs.
 
-**F. Layer Statistics**
+**F. Layer List**
 
-For each layer, compute:
-- Number of file nodes
-- Average fan-in of files in this layer
-- Average fan-out of files in this layer
-- The layer's "rank" in the dependency hierarchy (layers that are imported by many others but import few = foundational; layers that import many others but are imported by few = top-level)
+Record the layers provided in the input. Since layers contain only `{id, name, description}` (no node membership), simply output the layer count and the list of layers with their id, name, and description.
 
 **G. Node Summary Index**
 
-Create a lookup of each node ID to its `summary`, `type`, `tags` (default to empty array `[]` if not present in input), and `name` for easy reference. This lets the LLM phase quickly access semantic information without re-reading the full input.
+Create a lookup of each node ID to its `summary`, `type`, and `name` for easy reference. This lets the LLM phase quickly access semantic information without re-reading the full input.
+
+Note: input nodes are file-type only. The nodeSummaryIndex will contain only file nodes.
 
 ### Script Output Format
 
@@ -114,15 +111,19 @@ Create a lookup of each node ID to its `summary`, `type`, `tags` (default to emp
   "clusters": [
     {"nodes": ["file:src/services/auth.ts", "file:src/models/user.ts"], "edgeCount": 4}
   ],
-  "layerStats": [
-    {"id": "layer:core", "name": "Core", "fileCount": 5, "avgFanIn": 8.2, "avgFanOut": 3.1, "hierarchyRank": 1}
-  ],
+  "layers": {
+    "count": 3,
+    "list": [
+      {"id": "layer:core", "name": "Core", "description": "Core application logic"},
+      {"id": "layer:services", "name": "Services", "description": "Business logic services"},
+      {"id": "layer:ui", "name": "UI", "description": "User interface components"}
+    ]
+  },
   "nodeSummaryIndex": {
-    "file:src/index.ts": {"name": "index.ts", "type": "file", "summary": "Main entry point...", "tags": ["entry-point"]},
-    "file:src/utils.ts": {"name": "utils.ts", "type": "file", "summary": "Shared helpers...", "tags": []}
+    "file:src/index.ts": {"name": "index.ts", "type": "file", "summary": "Main entry point..."},
+    "file:src/utils.ts": {"name": "utils.ts", "type": "file", "summary": "Shared helpers..."}
   },
   "totalNodes": 42,
-  "totalFileNodes": 20,
   "totalEdges": 87
 }
 ```
@@ -179,13 +180,13 @@ You do not need to include every node from the BFS. Select the most important an
 
 When a `cluster` from the script output appears at the same BFS depth, group those nodes into a single tour step. Clusters represent tightly coupled code that should be explained together.
 
-### Step 4 -- Use Layer Statistics for Narrative Arc
+### Step 4 -- Use Layers for Narrative Arc
 
-The `layerStats` with `hierarchyRank` tells you which layers are foundational vs. top-level. Structure the tour to explain foundational layers before the layers that depend on them.
+The `layers` list gives you the project's architectural groupings. Use layer names and descriptions to understand which areas are foundational vs. top-level, and structure the tour to explain foundational layers before the layers that depend on them.
 
 ### Step 5 -- Write Step Descriptions
 
-For each step, use the `nodeSummaryIndex` to access node summaries, names, and tags without re-reading files. Each description must:
+For each step, use the `nodeSummaryIndex` to access node summaries and names without re-reading files. Each description must:
 
 - Explain WHAT this area does and WHY it matters to the project
 - Connect to previous steps (e.g., "Building on the User types from Step 2, this service implements...")

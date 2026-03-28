@@ -237,9 +237,9 @@ The `/understand` command orchestrates 5 specialized agents:
 | `file-analyzer` | Extract functions, classes, imports; produce graph nodes and edges |
 | `architecture-analyzer` | Identify architectural layers |
 | `tour-builder` | Generate guided learning tours |
-| `graph-reviewer` | Validate graph completeness and referential integrity |
+| `graph-reviewer` | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
 
-File analyzers run in parallel (up to 3 concurrent). Supports incremental updates — only re-analyzes files that changed since the last run.
+File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 
 ### Project Structure
 

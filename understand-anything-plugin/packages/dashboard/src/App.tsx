@@ -15,6 +15,16 @@ import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import WarningBanner from "./components/WarningBanner";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import type { KeyboardShortcut } from "./hooks/useKeyboardShortcuts";
+import { ThemeProvider } from "./themes/index.ts";
+import { ThemePicker } from "./components/ThemePicker.tsx";
+import type { ThemeConfig } from "./themes/index.ts";
+
+// Extract the access token from the URL so protected endpoints can be fetched.
+const ACCESS_TOKEN = new URLSearchParams(window.location.search).get("token");
+
+function tokenUrl(path: string): string {
+  return ACCESS_TOKEN ? `${path}?token=${ACCESS_TOKEN}` : path;
+}
 
 function App() {
   const graph = useDashboardStore((s) => s.graph);
@@ -28,6 +38,16 @@ function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
+
+  useEffect(() => {
+    fetch(tokenUrl("/meta.json"))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((meta) => {
+        if (meta?.theme) setMetaTheme(meta.theme);
+      })
+      .catch(() => {});
+  }, []);
 
   // Define keyboard shortcuts
   const shortcuts = useMemo<KeyboardShortcut[]>(
@@ -120,7 +140,7 @@ function App() {
   useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
-    fetch("/knowledge-graph.json")
+    fetch(tokenUrl("/knowledge-graph.json"))
       .then((res) => res.json())
       .then((data: unknown) => {
         const result = validateGraph(data);
@@ -149,7 +169,7 @@ function App() {
   }, [setGraph]);
 
   useEffect(() => {
-    fetch("/diff-overlay.json")
+    fetch(tokenUrl("/diff-overlay.json"))
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
@@ -187,6 +207,7 @@ function App() {
   );
 
   return (
+    <ThemeProvider metaTheme={metaTheme}>
     <div className="h-screen w-screen flex flex-col bg-root text-text-primary noise-overlay">
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-3 bg-surface border-b border-border-subtle shrink-0">
@@ -200,9 +221,10 @@ function App() {
         <div className="flex items-center gap-4">
           <DiffToggle />
           <LayerLegend />
+          <ThemePicker />
           <button
             onClick={() => setShowKeyboardHelp(true)}
-            className="text-text-muted hover:text-gold transition-colors"
+            className="text-text-muted hover:text-accent transition-colors"
             title="Keyboard shortcuts (Shift + ?)"
           >
             <svg
@@ -280,6 +302,7 @@ function App() {
         />
       )}
     </div>
+    </ThemeProvider>
   );
 }
 

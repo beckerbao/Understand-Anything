@@ -62,7 +62,7 @@ export default function KeyboardShortcutsHelp({
         <div className="p-6 space-y-6">
           {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
             <div key={category}>
-              <h3 className="text-sm font-semibold text-gold uppercase tracking-wider mb-3">
+              <h3 className="text-sm font-semibold text-accent uppercase tracking-wider mb-3">
                 {category}
               </h3>
               <div className="space-y-2">

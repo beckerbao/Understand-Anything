@@ -27,8 +27,8 @@ export default function CodeViewer() {
           className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border"
           style={{
             color: "var(--color-node-file)",
-            borderColor: "rgba(74,124,155,0.3)",
-            backgroundColor: "rgba(74,124,155,0.1)",
+            borderColor: "color-mix(in srgb, var(--color-node-file) 30%, transparent)",
+            backgroundColor: "color-mix(in srgb, var(--color-node-file) 10%, transparent)",
           }}
         >
           {node.type}
@@ -56,14 +56,14 @@ export default function CodeViewer() {
       <div className="flex-1 overflow-auto p-5">
         {/* Summary */}
         <div className="mb-4">
-          <h4 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">Summary</h4>
+          <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">Summary</h4>
           <p className="text-sm text-text-secondary leading-relaxed">{node.summary}</p>
         </div>
 
         {/* Language notes callout */}
         {node.languageNotes && (
-          <div className="mb-4 bg-gold/5 border border-gold/20 rounded-lg p-3">
-            <h4 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-1.5">Language Notes</h4>
+          <div className="mb-4 bg-accent/5 border border-accent/20 rounded-lg p-3">
+            <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-1.5">Language Notes</h4>
             <p className="text-sm text-text-secondary leading-relaxed">{node.languageNotes}</p>
           </div>
         )}
@@ -71,7 +71,7 @@ export default function CodeViewer() {
         {/* Tags */}
         {node.tags.length > 0 && (
           <div className="mb-4">
-            <h4 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">Tags</h4>
+            <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">Tags</h4>
             <div className="flex flex-wrap gap-1.5">
               {node.tags.map((tag) => (
                 <span key={tag} className="text-[11px] glass text-text-secondary px-2.5 py-1 rounded-full">

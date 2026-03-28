@@ -106,6 +106,40 @@ Extract from (in priority order):
 4. `pyproject.toml` -- check `[project].name` first, then `[tool.poetry].name`
 5. Directory name of project root
 
+**Step 8 -- Import Resolution**
+
+For each file in the discovered source list, extract and resolve relative import statements. The goal is to produce a map from each file's path to the list of project-internal files it imports. External package imports are ignored.
+
+For each file, read its content and extract import paths using language-appropriate patterns:
+
+| Language | Import patterns to match |
+|---|---|
+| TypeScript/JavaScript | `import ... from './...'` or `'../'`, `require('./...')` or `require('../...')` |
+| Python | `from .x import y`, `from ..x import y`, `from . import x` (relative only) |
+| Go | Paths in `import (...)` blocks that start with the module path from `go.mod` |
+| Rust | `use crate::`, `use super::`, `mod x` (within the same crate) |
+| Java/Kotlin | Not resolvable by path — skip import resolution for these languages |
+| Ruby | `require_relative '...'` paths |
+
+For each extracted import path:
+1. Compute the resolved file path relative to project root:
+   - For relative imports (`./x`, `../x`): resolve from the importing file's directory
+   - Try these extension variants in order if the import has no extension: `.ts`, `.tsx`, `.js`, `.jsx`, `/index.ts`, `/index.js`, `/index.tsx`, `/index.jsx`, `.py`, `.go`, `.rs`, `.rb`
+2. Check if the resolved path exists in the discovered file list
+3. If yes: add to this file's resolved imports list
+4. If no: skip (external, unresolvable, or dynamic import)
+
+Output format in the script result:
+```json
+"importMap": {
+  "src/index.ts": ["src/utils.ts", "src/config.ts"],
+  "src/utils.ts": [],
+  "src/components/App.tsx": ["src/hooks/useAuth.ts", "src/store/index.ts"]
+}
+```
+
+Keys are project-relative paths. Values are arrays of resolved project-relative paths. Every key in the file list must appear in `importMap` (use an empty array `[]` if no imports were resolved). External packages and unresolvable imports are omitted entirely.
+
 ### Script Output Format
 
 The script must write this exact JSON structure to the output file:
@@ -122,7 +156,11 @@ The script must write this exact JSON structure to the output file:
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150}
   ],
   "totalFiles": 42,
-  "estimatedComplexity": "moderate"
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    "src/index.ts": ["src/utils.ts", "src/config.ts"],
+    "src/utils.ts": []
+  }
 }
 ```
 
@@ -135,6 +173,7 @@ The script must write this exact JSON structure to the output file:
 - `files` (object[]) -- every source file, sorted by `path` alphabetically
 - `totalFiles` (integer) -- must equal `files.length`
 - `estimatedComplexity` (string) -- one of `small`, `moderate`, `large`, `very-large`
+- `importMap` (object) — map from every source file path to its list of resolved project-internal import paths; empty array if no resolved imports; external packages excluded
 
 ### Executing the Script
 
@@ -154,7 +193,7 @@ If the script exits with a non-zero code, read stderr, diagnose the issue, fix t
 
 After the script completes, read `$PROJECT_ROOT/.understand-anything/tmp/ua-scan-results.json`. Do NOT re-run file discovery commands or re-count lines -- trust the script's results entirely.
 
-**IMPORTANT:** The final output must NOT contain the `scriptCompleted`, `rawDescription`, or `readmeHead` fields. These are intermediate script fields only. Strip them when assembling the final JSON.
+**IMPORTANT:** The final output must NOT contain the `scriptCompleted`, `rawDescription`, or `readmeHead` fields. These are intermediate script fields only. Strip them when assembling the final JSON. All other fields — including `importMap` — MUST be preserved exactly as output by the script.
 
 Your only task in this phase is to produce the final `description` field:
 
@@ -175,7 +214,10 @@ Then assemble the final output JSON:
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150}
   ],
   "totalFiles": 42,
-  "estimatedComplexity": "moderate"
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    "src/index.ts": ["src/utils.ts"]
+  }
 }
 ```
 
@@ -187,6 +229,7 @@ Then assemble the final output JSON:
 - `files` (object[]): directly from script output
 - `totalFiles` (integer): directly from script output
 - `estimatedComplexity` (string): directly from script output
+- `importMap` (object): directly from script output
 
 ## Critical Constraints
 

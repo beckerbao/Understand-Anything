@@ -12,6 +12,9 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
 
 - `$ARGUMENTS` may contain:
   - `--full` — Force a full rebuild, ignoring any existing graph
+  - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
+  - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
+  - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - A directory path — Scope analysis to a specific subdirectory
 
 ---
@@ -30,6 +33,11 @@ Determine whether to run a full analysis or incremental update.
    mkdir -p $PROJECT_ROOT/.understand-anything/intermediate
    mkdir -p $PROJECT_ROOT/.understand-anything/tmp
    ```
+3.5. **Auto-update configuration:**
+   - If `--auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": true}` to `$PROJECT_ROOT/.understand-anything/config.json`
+   - If `--no-auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": false}` to `$PROJECT_ROOT/.understand-anything/config.json`
+   - These flags only set the config — analysis proceeds normally regardless.
+
 4. Check if `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` exists. If it does, read it.
 5. Check if `$PROJECT_ROOT/.understand-anything/meta.json` exists. If it does, read it to get `gitCommitHash`.
 6. **Decision logic:**
@@ -38,8 +46,11 @@ Determine whether to run a full analysis or incremental update.
    |---|---|
    | `--full` flag in `$ARGUMENTS` | Full analysis (all phases) |
    | No existing graph or meta | Full analysis (all phases) |
-   | Existing graph + unchanged commit hash | Report "Graph is up to date" and STOP |
+   | `--review` flag + existing graph + unchanged commit hash | Skip to Phase 6 (review-only — reuse existing assembled graph) |
+   | Existing graph + unchanged commit hash | Ask the user: "The graph is up to date at this commit. Would you like to: **(a)** run a full rebuild (`--full`), **(b)** run the LLM graph reviewer (`--review`), or **(c)** do nothing?" Then follow their choice. If they pick (c), STOP. |
    | Existing graph + changed files | Incremental update (re-analyze changed files only) |
+
+   **Review-only path:** Copy the existing `knowledge-graph.json` to `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`, then jump directly to Phase 6 step 3.
 
    For incremental updates, get the changed file list:
    ```bash
@@ -88,6 +99,9 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 - Languages, frameworks
 - File list with line counts
 - Complexity estimate
+- Import map (`importMap`): pre-resolved project-internal imports per file
+
+Store `importMap` in memory as `$IMPORT_MAP` for use in Phase 2 batch construction.
 
 **Gate check:** If >200 files, inform the user and suggest scoping with a subdirectory argument. Proceed only if user confirms or add guidance that this may take a while.
 
@@ -97,24 +111,21 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 
 ### Full analysis path
 
-Batch the file list from Phase 1 into groups of **5-10 files each** (aim for balanced batch sizes).
+Batch the file list from Phase 1 into groups of **20-30 files each** (aim for ~25 files per batch for balanced sizes).
 
-For each batch, dispatch a subagent using the prompt template at `./file-analyzer-prompt.md`. Run up to **3 subagents concurrently** using parallel dispatch.
-
-**Build the combined prompt template:**
-1. Read the base template at `./file-analyzer-prompt.md`.
-2. **Language context injection:** For each language detected in Phase 1 (e.g., `python`), read the file at `./languages/<language-id>.md` (e.g., `./languages/python.md`) and append its content after the base template under a `## Language Context` header. If the file does not exist for a detected language, skip it silently and continue. These files are in the `languages/` subdirectory next to this SKILL.md file. Use `ls ./languages/` to discover available language files if needed.
-3. **Framework addendum injection:** For each framework detected in Phase 1 (e.g., `Django`), read the file at `./frameworks/<framework-id-lowercase>.md` (e.g., `./frameworks/django.md`) and append its full content after the language context. If the file does not exist for a detected framework, skip it silently and continue. These files are in the `frameworks/` subdirectory next to this SKILL.md file. Use `ls ./frameworks/` to discover available framework files if needed.
-
-Then for each batch pass the combined template content as the subagent's prompt, appending the following additional context:
+For each batch, dispatch a subagent using the prompt template at `./file-analyzer-prompt.md`. Run up to **5 subagents concurrently** using parallel dispatch. Pass the template as the subagent's prompt, appending the following additional context:
 
 > **Additional context from main session:**
 >
 > Project: `<projectName>` — `<projectDescription>`
-> Frameworks detected: `<frameworks from Phase 1>`
 > Languages: `<languages from Phase 1>`
->
-> Use the language context and framework addendums (appended above) to produce more accurate summaries and better classify file roles.
+
+Before dispatching each batch, construct `batchImportData` from `$IMPORT_MAP`:
+```json
+batchImportData = {}
+for each file in this batch:
+  batchImportData[file.path] = $IMPORT_MAP[file.path] ?? []
+```
 
 Fill in batch-specific parameters below and dispatch:
 
@@ -125,8 +136,10 @@ Fill in batch-specific parameters below and dispatch:
 > Batch index: `<batchIndex>`
 > Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/batch-<batchIndex>.json`
 >
-> All project files (for import resolution):
-> `<full file path list from scan>`
+> Pre-resolved import data for this batch (use this for all import edge creation — do NOT re-resolve imports from source):
+> ```json
+> <batchImportData JSON>
+> ```
 >
 > Files to analyze in this batch:
 > 1. `<path>` (<sizeLines> lines)
@@ -139,7 +152,7 @@ After ALL batches complete, read each `batch-<N>.json` file and merge:
 
 ### Incremental update path
 
-Use the changed files list from Phase 0. Batch and dispatch file-analyzer subagents using the same process as above, but only for changed files.
+Use the changed files list from Phase 0. Batch and dispatch file-analyzer subagents using the same process as above (20-30 files per batch, up to 5 concurrent, with batchImportData constructed from $IMPORT_MAP), but only for changed files.
 
 After batches complete, merge with the existing graph:
 1. Remove old nodes whose `filePath` matches any changed file
@@ -187,7 +200,7 @@ Pass these parameters in the dispatch prompt:
 >
 > File nodes:
 > ```json
-> [list of {id, name, filePath, summary, tags} for all file-type nodes]
+> [list of {id, name, filePath, summary, tags} for all file-type nodes — omit complexity, languageNotes]
 > ```
 >
 > Import edges:
@@ -254,19 +267,19 @@ Pass these parameters in the dispatch prompt:
 > Project: `<projectName>` — `<projectDescription>`
 > Languages: `<languages>`
 >
-> Nodes (summarized):
+> Nodes (file nodes only):
 > ```json
-> [list of {id, name, filePath, summary, type} for key nodes]
+> [list of {id, name, filePath, summary, type} for file-type nodes ONLY — do NOT include function or class nodes]
 > ```
 >
 > Layers:
 > ```json
-> [layers from Phase 4]
+> [list of {id, name, description} for each layer — omit nodeIds]
 > ```
 >
-> Key edges:
+> Edges (imports and calls only):
 > ```json
-> [imports and calls edges]
+> [list of edges where type is "imports" or "calls" only — exclude all other edge types]
 > ```
 
 After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/tour.json` and normalize it into a final `tour` array. Apply these steps **in order**:
@@ -327,7 +340,95 @@ Assemble the full KnowledgeGraph JSON object:
 
 2. Write the assembled graph to `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
 
-3. Dispatch a subagent using the prompt template at `./graph-reviewer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+3. **Check `$ARGUMENTS` for `--review` flag.** Then run the appropriate validation path:
+
+---
+
+#### Default path (no `--review`): inline deterministic validation
+
+Write the following Node.js script to `$PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs`:
+
+```javascript
+#!/usr/bin/env node
+const fs = require('fs');
+const graphPath = process.argv[2];
+const outputPath = process.argv[3];
+try {
+  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
+  const issues = [], warnings = [];
+  if (!Array.isArray(graph.nodes)) { issues.push('graph.nodes is missing or not an array'); graph.nodes = []; }
+  if (!Array.isArray(graph.edges)) { issues.push('graph.edges is missing or not an array'); graph.edges = []; }
+  const nodeIds = new Set();
+  const seen = new Map();
+  graph.nodes.forEach((n, i) => {
+    if (!n.id) { issues.push(`Node[${i}] missing id`); return; }
+    if (!n.type) issues.push(`Node[${i}] '${n.id}' missing type`);
+    if (!n.name) issues.push(`Node[${i}] '${n.id}' missing name`);
+    if (!n.summary) issues.push(`Node[${i}] '${n.id}' missing summary`);
+    if (!n.tags || !n.tags.length) issues.push(`Node[${i}] '${n.id}' missing tags`);
+    if (seen.has(n.id)) issues.push(`Duplicate node ID '${n.id}' at indices ${seen.get(n.id)} and ${i}`);
+    else seen.set(n.id, i);
+    nodeIds.add(n.id);
+  });
+  graph.edges.forEach((e, i) => {
+    if (!nodeIds.has(e.source)) issues.push(`Edge[${i}] source '${e.source}' not found`);
+    if (!nodeIds.has(e.target)) issues.push(`Edge[${i}] target '${e.target}' not found`);
+  });
+  const fileNodes = graph.nodes.filter(n => n.type === 'file').map(n => n.id);
+  const assigned = new Map();
+  if (!Array.isArray(graph.layers)) { if (graph.layers) warnings.push('graph.layers is not an array'); graph.layers = []; }
+  if (!Array.isArray(graph.tour)) { if (graph.tour) warnings.push('graph.tour is not an array'); graph.tour = []; }
+  graph.layers.forEach(layer => {
+    (layer.nodeIds || []).forEach(id => {
+      if (!nodeIds.has(id)) issues.push(`Layer '${layer.id}' refs missing node '${id}'`);
+      if (assigned.has(id)) issues.push(`Node '${id}' appears in multiple layers`);
+      assigned.set(id, layer.id);
+    });
+  });
+  fileNodes.forEach(id => {
+    if (!assigned.has(id)) issues.push(`File node '${id}' not in any layer`);
+  });
+  graph.tour.forEach((step, i) => {
+    (step.nodeIds || []).forEach(id => {
+      if (!nodeIds.has(id)) issues.push(`Tour step[${i}] refs missing node '${id}'`);
+    });
+  });
+  const withEdges = new Set([
+    ...graph.edges.map(e => e.source),
+    ...graph.edges.map(e => e.target)
+  ]);
+  graph.nodes.forEach(n => {
+    if (!withEdges.has(n.id)) warnings.push(`Node '${n.id}' has no edges (orphan)`);
+  });
+  const stats = {
+    totalNodes: graph.nodes.length,
+    totalEdges: graph.edges.length,
+    totalLayers: graph.layers.length,
+    tourSteps: graph.tour.length,
+    nodeTypes: graph.nodes.reduce((a, n) => { a[n.type] = (a[n.type]||0)+1; return a; }, {}),
+    edgeTypes: graph.edges.reduce((a, e) => { a[e.type] = (a[e.type]||0)+1; return a; }, {})
+  };
+  fs.writeFileSync(outputPath, JSON.stringify({ issues, warnings, stats }, null, 2));
+  process.exit(0);
+} catch (err) { process.stderr.write(err.message + '\n'); process.exit(1); }
+```
+
+Execute it:
+```bash
+node $PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs \
+  "$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json" \
+  "$PROJECT_ROOT/.understand-anything/intermediate/review.json"
+```
+
+If the script exits non-zero, read stderr, fix the script, and retry once.
+
+---
+
+#### `--review` path: full LLM reviewer
+
+If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
+
+Dispatch a subagent using the prompt template at `./graph-reviewer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
 
 > **Additional context from main session:**
 >
@@ -343,14 +444,16 @@ Assemble the full KnowledgeGraph JSON object:
 
 Pass these parameters in the dispatch prompt:
 
-   > Validate the knowledge graph at `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
-   > Project root: `$PROJECT_ROOT`
-   > Read the file and validate it for completeness and correctness.
-   > Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/review.json`
+> Validate the knowledge graph at `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
+> Project root: `$PROJECT_ROOT`
+> Read the file and validate it for completeness and correctness.
+> Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/review.json`
 
-4. After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/review.json`.
+---
 
-5. **If `approved: false`:**
+4. Read `$PROJECT_ROOT/.understand-anything/intermediate/review.json`.
+
+5. **If `issues` array is non-empty:**
    - Review the `issues` list
    - Apply automated fixes where possible:
      - Remove edges with dangling references
@@ -359,7 +462,7 @@ Pass these parameters in the dispatch prompt:
    - Re-run the final graph validation after automated fixes
    - If critical issues remain after one fix attempt, save the graph anyway but include the warnings in the final report and mark dashboard auto-launch as skipped
 
-6. **If `approved: true`:** Proceed to Phase 7.
+6. **If `issues` array is empty:** Proceed to Phase 7.
 
 ---
 
@@ -376,6 +479,18 @@ Pass these parameters in the dispatch prompt:
      "analyzedFiles": <number of files analyzed>
    }
    ```
+
+2.5. **Generate structural fingerprints** for all analyzed files and save to `$PROJECT_ROOT/.understand-anything/fingerprints.json`. This creates the baseline for future automatic incremental updates.
+
+   Write and execute a Node.js script that uses the core fingerprint module (tree-sitter-based, not regex):
+   ```javascript
+   import { buildFingerprintStore } from '@understand-anything/core';
+   import { saveFingerprints } from '@understand-anything/core';
+
+   const store = await buildFingerprintStore('<PROJECT_ROOT>', sourceFilePaths);
+   saveFingerprints('<PROJECT_ROOT>', store);
+   ```
+   Where `sourceFilePaths` is the list of all analyzed source file paths from Phase 1. This uses the same tree-sitter analysis pipeline as the main fingerprint engine, ensuring the baseline matches the comparison logic used during auto-updates.
 
 3. Clean up intermediate files:
    ```bash
@@ -401,7 +516,7 @@ Pass these parameters in the dispatch prompt:
 ## Error Handling
 
 - If any subagent dispatch fails, retry **once** with the same prompt plus additional context about the failure.
-- Track all warnings and errors from each phase in a `$PHASE_WARNINGS` list. Pass this list to the graph-reviewer in Phase 6 for comprehensive validation.
+- Track all warnings and errors from each phase in a `$PHASE_WARNINGS` list. When using `--review`, pass this list to the graph-reviewer in Phase 6. On the default path, include accumulated warnings in the Phase 7 final report.
 - If it fails a second time, skip that phase and continue with partial results.
 - ALWAYS save partial results — a partial graph is better than no graph.
 - Report any skipped phases or errors in the final summary so the user knows what happened.

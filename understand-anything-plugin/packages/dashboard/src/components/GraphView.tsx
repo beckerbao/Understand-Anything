@@ -21,6 +21,7 @@ import PortalNode from "./PortalNode";
 import type { PortalFlowNode } from "./PortalNode";
 import Breadcrumb from "./Breadcrumb";
 import { useDashboardStore } from "../store";
+import { useTheme } from "../themes/index.ts";
 import {
   applyDagreLayout,
   NODE_WIDTH,
@@ -425,6 +426,7 @@ function GraphViewInner() {
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
   const detailGraph = useLayerDetailGraph();
@@ -510,18 +512,13 @@ function GraphViewInner() {
         fitViewOptions={{ minZoom: 0.01, padding: 0.1 }}
         minZoom={0.01}
         maxZoom={2}
-        colorMode="dark"
+        colorMode={preset.isDark ? "dark" : "light"}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          color="rgba(212,165,116,0.15)"
-          gap={20}
-          size={1}
-        />
+        <Background variant={BackgroundVariant.Dots} color="var(--color-edge-dot)" gap={20} size={1} />
         <Controls />
         <MiniMap
-          nodeColor="#1a1a1a"
-          maskColor="rgba(10,10,10,0.7)"
+          nodeColor="var(--color-elevated)"
+          maskColor="var(--glass-bg)"
           className="!bg-surface !border !border-border-subtle"
         />
         <TourFitView />
