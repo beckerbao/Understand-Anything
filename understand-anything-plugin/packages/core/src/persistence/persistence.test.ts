@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { saveGraph, loadGraph, saveMeta, loadMeta } from "./index.js";
+import { writeFileSync } from "node:fs";
+import { saveGraph, loadGraph, saveMeta, loadMeta, saveFingerprints, loadFingerprints, saveConfig, loadConfig } from "./index.js";
 import type { KnowledgeGraph, AnalysisMeta } from "../types.js";
+import type { FingerprintStore } from "../fingerprint.js";
 
 describe("persistence", () => {
   let tempDir: string;
@@ -113,6 +115,72 @@ describe("persistence", () => {
     it("should return null when no meta exists", () => {
       const loaded = loadMeta(tempDir);
       expect(loaded).toBeNull();
+    });
+  });
+
+  describe("saveFingerprints / loadFingerprints", () => {
+    const sampleFingerprints: FingerprintStore = {
+      version: "1.0.0",
+      gitCommitHash: "abc123",
+      generatedAt: "2026-03-14T00:00:00.000Z",
+      files: {
+        "src/index.ts": {
+          filePath: "src/index.ts",
+          contentHash: "deadbeef",
+          functions: [],
+          classes: [],
+          imports: [],
+          exports: [],
+          totalLines: 10,
+          hasStructuralAnalysis: false,
+        },
+      },
+    };
+
+    it("should round-trip fingerprints correctly", () => {
+      saveFingerprints(tempDir, sampleFingerprints);
+      const loaded = loadFingerprints(tempDir);
+
+      expect(loaded).toEqual(sampleFingerprints);
+    });
+
+    it("should return null when no fingerprints file exists", () => {
+      const loaded = loadFingerprints(tempDir);
+      expect(loaded).toBeNull();
+    });
+
+    it("should return null when fingerprints.json is corrupted", () => {
+      const dir = join(tempDir, ".understand-anything");
+      // Ensure the directory exists by saving first, then overwrite with garbage
+      saveFingerprints(tempDir, sampleFingerprints);
+      writeFileSync(join(dir, "fingerprints.json"), "{{not valid json!!", "utf-8");
+
+      const loaded = loadFingerprints(tempDir);
+      expect(loaded).toBeNull();
+    });
+  });
+
+  describe("saveConfig / loadConfig", () => {
+    it("should round-trip config correctly", () => {
+      saveConfig(tempDir, { autoUpdate: true });
+      const loaded = loadConfig(tempDir);
+
+      expect(loaded).toEqual({ autoUpdate: true });
+    });
+
+    it("should return default config when no file exists", () => {
+      const loaded = loadConfig(tempDir);
+
+      expect(loaded).toEqual({ autoUpdate: false });
+    });
+
+    it("should return default config when config.json is corrupted", () => {
+      saveConfig(tempDir, { autoUpdate: true });
+      const dir = join(tempDir, ".understand-anything");
+      writeFileSync(join(dir, "config.json"), "not json!!", "utf-8");
+
+      const loaded = loadConfig(tempDir);
+      expect(loaded).toEqual({ autoUpdate: false });
     });
   });
 });

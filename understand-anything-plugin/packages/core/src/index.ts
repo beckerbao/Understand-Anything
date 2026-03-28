@@ -71,3 +71,22 @@ export {
   cosineSimilarity,
   type SemanticSearchOptions,
 } from "./embedding-search.js";
+export {
+  extractFileFingerprint,
+  compareFingerprints,
+  analyzeChanges,
+  buildFingerprintStore,
+  contentHash,
+  type FunctionFingerprint,
+  type ClassFingerprint,
+  type ImportFingerprint,
+  type FileFingerprint,
+  type FingerprintStore,
+  type ChangeLevel,
+  type FileChangeResult,
+  type ChangeAnalysis,
+} from "./fingerprint.js";
+export {
+  classifyUpdate,
+  type UpdateDecision,
+} from "./change-classifier.js";

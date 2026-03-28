@@ -12,6 +12,8 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
 
 - `$ARGUMENTS` may contain:
   - `--full` — Force a full rebuild, ignoring any existing graph
+  - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
+  - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - A directory path — Scope analysis to a specific subdirectory
 
@@ -31,6 +33,11 @@ Determine whether to run a full analysis or incremental update.
    mkdir -p $PROJECT_ROOT/.understand-anything/intermediate
    mkdir -p $PROJECT_ROOT/.understand-anything/tmp
    ```
+3.5. **Auto-update configuration:**
+   - If `--auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": true}` to `$PROJECT_ROOT/.understand-anything/config.json`
+   - If `--no-auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": false}` to `$PROJECT_ROOT/.understand-anything/config.json`
+   - These flags only set the config — analysis proceeds normally regardless.
+
 4. Check if `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` exists. If it does, read it.
 5. Check if `$PROJECT_ROOT/.understand-anything/meta.json` exists. If it does, read it to get `gitCommitHash`.
 6. **Decision logic:**
@@ -472,6 +479,18 @@ Pass these parameters in the dispatch prompt:
      "analyzedFiles": <number of files analyzed>
    }
    ```
+
+2.5. **Generate structural fingerprints** for all analyzed files and save to `$PROJECT_ROOT/.understand-anything/fingerprints.json`. This creates the baseline for future automatic incremental updates.
+
+   Write and execute a Node.js script that uses the core fingerprint module (tree-sitter-based, not regex):
+   ```javascript
+   import { buildFingerprintStore } from '@understand-anything/core';
+   import { saveFingerprints } from '@understand-anything/core';
+
+   const store = await buildFingerprintStore('<PROJECT_ROOT>', sourceFilePaths);
+   saveFingerprints('<PROJECT_ROOT>', store);
+   ```
+   Where `sourceFilePaths` is the list of all analyzed source file paths from Phase 1. This uses the same tree-sitter analysis pipeline as the main fingerprint engine, ensuring the baseline matches the comparison logic used during auto-updates.
 
 3. Clean up intermediate files:
    ```bash
