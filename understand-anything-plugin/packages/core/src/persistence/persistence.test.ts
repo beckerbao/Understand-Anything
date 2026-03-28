@@ -93,8 +93,8 @@ describe("persistence", () => {
       expect(loaded).toBeNull();
     });
 
-    it("should throw error when loading invalid graph", () => {
-      const invalidGraph = { ...sampleGraph, version: 123 }; // Invalid version type
+    it("should throw error when loading a fatally invalid graph", () => {
+      const invalidGraph = { ...sampleGraph, nodes: "not-an-array" };
       saveGraph(tempDir, invalidGraph as unknown as KnowledgeGraph);
 
       expect(() => {
