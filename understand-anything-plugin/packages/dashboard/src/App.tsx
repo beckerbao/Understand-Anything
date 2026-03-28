@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
@@ -13,20 +13,57 @@ import PersonaSelector from "./components/PersonaSelector";
 import ProjectOverview from "./components/ProjectOverview";
 import KeyboardShortcutsHelp from "./components/KeyboardShortcutsHelp";
 import WarningBanner from "./components/WarningBanner";
+import TokenGate from "./components/TokenGate";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import type { KeyboardShortcut } from "./hooks/useKeyboardShortcuts";
 import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
 import type { ThemeConfig } from "./themes/index.ts";
 
-// Extract the access token from the URL so protected endpoints can be fetched.
-const ACCESS_TOKEN = new URLSearchParams(window.location.search).get("token");
+const SESSION_TOKEN_KEY = "understand-anything-token";
 
-function tokenUrl(path: string): string {
-  return ACCESS_TOKEN ? `${path}?token=${ACCESS_TOKEN}` : path;
+/**
+ * Resolve the access token from the URL query string or sessionStorage.
+ * If found in the URL, persist to sessionStorage and strip the param from the address bar.
+ */
+function resolveInitialToken(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get("token");
+  if (urlToken) {
+    sessionStorage.setItem(SESSION_TOKEN_KEY, urlToken);
+    // Clean the URL
+    params.delete("token");
+    const cleanSearch = params.toString();
+    const newUrl =
+      window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
+    window.history.replaceState(null, "", newUrl);
+    return urlToken;
+  }
+  return sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+/** Build a URL with the token query param appended. */
+function tokenUrl(path: string, token: string | null): string {
+  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
 }
 
 function App() {
+  const [accessToken, setAccessToken] = useState<string | null>(resolveInitialToken);
+
+  const handleTokenValid = useCallback((token: string) => {
+    sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    setAccessToken(token);
+  }, []);
+
+  // Show the token gate when no token is available
+  if (accessToken === null) {
+    return <TokenGate onTokenValid={handleTokenValid} />;
+  }
+
+  return <Dashboard accessToken={accessToken} />;
+}
+
+function Dashboard({ accessToken }: { accessToken: string }) {
   const graph = useDashboardStore((s) => s.graph);
   const setGraph = useDashboardStore((s) => s.setGraph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
@@ -41,7 +78,7 @@ function App() {
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
 
   useEffect(() => {
-    fetch(tokenUrl("/meta.json"))
+    fetch(tokenUrl("/meta.json", accessToken))
       .then((r) => (r.ok ? r.json() : null))
       .then((meta) => {
         if (meta?.theme) setMetaTheme(meta.theme);
@@ -133,7 +170,7 @@ function App() {
   useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
-    fetch(tokenUrl("/knowledge-graph.json"))
+    fetch(tokenUrl("/knowledge-graph.json", accessToken))
       .then((res) => res.json())
       .then((data: unknown) => {
         const result = validateGraph(data);
@@ -162,7 +199,7 @@ function App() {
   }, [setGraph]);
 
   useEffect(() => {
-    fetch(tokenUrl("/diff-overlay.json"))
+    fetch(tokenUrl("/diff-overlay.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
