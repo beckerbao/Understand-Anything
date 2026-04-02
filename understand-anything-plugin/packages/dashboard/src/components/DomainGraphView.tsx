@@ -11,10 +11,12 @@ import type { Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import DomainClusterNode from "./DomainClusterNode";
+import type { DomainClusterFlowNode } from "./DomainClusterNode";
 import FlowNode from "./FlowNode";
+import type { FlowFlowNode } from "./FlowNode";
 import StepNode from "./StepNode";
+import type { StepFlowNode } from "./StepNode";
 import { useDashboardStore } from "../store";
-import { useTheme } from "../themes/index.ts";
 import { applyDagreLayout } from "../utils/layout";
 import type { KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
@@ -24,14 +26,12 @@ const nodeTypes = {
   "step-node": StepNode,
 };
 
-// Dimensions for domain-specific nodes
-const DOMAIN_NODE_DIMENSIONS = new Map<string, { width: number; height: number }>();
-
 function getDomainMeta(node: GraphNode): Record<string, unknown> | undefined {
   return (node as any).domainMeta;
 }
 
 function buildDomainOverview(graph: KnowledgeGraph): { nodes: Node[]; edges: Edge[] } {
+  const dims = new Map<string, { width: number; height: number }>();
   const domainNodes = graph.nodes.filter((n) => n.type === "domain");
 
   // Count flows per domain
@@ -42,7 +42,7 @@ function buildDomainOverview(graph: KnowledgeGraph): { nodes: Node[]; edges: Edg
     }
   }
 
-  const rfNodes: Node[] = domainNodes.map((node) => {
+  const rfNodes: DomainClusterFlowNode[] = domainNodes.map((node) => {
     const meta = getDomainMeta(node);
     const data = {
       label: node.name,
@@ -52,7 +52,7 @@ function buildDomainOverview(graph: KnowledgeGraph): { nodes: Node[]; edges: Edg
       businessRules: meta?.businessRules as string[] | undefined,
       domainId: node.id,
     };
-    DOMAIN_NODE_DIMENSIONS.set(node.id, { width: 320, height: 180 });
+    dims.set(node.id, { width: 320, height: 180 });
     return {
       id: node.id,
       type: "domain-cluster" as const,
@@ -73,7 +73,7 @@ function buildDomainOverview(graph: KnowledgeGraph): { nodes: Node[]; edges: Edg
       animated: true,
     }));
 
-  return applyDagreLayout(rfNodes, rfEdges, "LR", DOMAIN_NODE_DIMENSIONS);
+  return applyDagreLayout(rfNodes, rfEdges, "LR", dims);
 }
 
 function buildDomainDetail(
@@ -108,40 +108,39 @@ function buildDomainDetail(
 
   const dims = new Map<string, { width: number; height: number }>();
 
-  const rfNodes: Node[] = [
-    ...flowNodes.map((node) => {
-      const meta = getDomainMeta(node);
-      dims.set(node.id, { width: 260, height: 120 });
-      return {
-        id: node.id,
-        type: "flow-node" as const,
-        position: { x: 0, y: 0 },
-        data: {
-          label: node.name,
-          summary: node.summary,
-          entryPoint: meta?.entryPoint as string | undefined,
-          entryType: meta?.entryType as string | undefined,
-          stepCount: stepCountMap.get(node.id) ?? 0,
-          flowId: node.id,
-        },
-      };
-    }),
-    ...stepNodes.map((node) => {
-      dims.set(node.id, { width: 200, height: 90 });
-      return {
-        id: node.id,
-        type: "step-node" as const,
-        position: { x: 0, y: 0 },
-        data: {
-          label: node.name,
-          summary: node.summary,
-          filePath: node.filePath,
-          stepId: node.id,
-          order: Math.round((stepOrderMap.get(node.id) ?? 0) * 10),
-        },
-      };
-    }),
-  ];
+  const flowRfNodes: FlowFlowNode[] = flowNodes.map((node) => {
+    const meta = getDomainMeta(node);
+    dims.set(node.id, { width: 260, height: 120 });
+    return {
+      id: node.id,
+      type: "flow-node" as const,
+      position: { x: 0, y: 0 },
+      data: {
+        label: node.name,
+        summary: node.summary,
+        entryPoint: meta?.entryPoint as string | undefined,
+        entryType: meta?.entryType as string | undefined,
+        stepCount: stepCountMap.get(node.id) ?? 0,
+        flowId: node.id,
+      },
+    };
+  });
+  const stepRfNodes: StepFlowNode[] = stepNodes.map((node) => {
+    dims.set(node.id, { width: 200, height: 90 });
+    return {
+      id: node.id,
+      type: "step-node" as const,
+      position: { x: 0, y: 0 },
+      data: {
+        label: node.name,
+        summary: node.summary,
+        filePath: node.filePath,
+        stepId: node.id,
+        order: Math.round((stepOrderMap.get(node.id) ?? 0) * 10),
+      },
+    };
+  });
+  const rfNodes: Node[] = [...flowRfNodes, ...stepRfNodes];
 
   const rfEdges: Edge[] = stepEdges.map((e) => ({
     id: `${e.source}-${e.target}`,
@@ -158,7 +157,6 @@ function DomainGraphViewInner() {
   const domainGraph = useDashboardStore((s) => s.domainGraph);
   const activeDomainId = useDashboardStore((s) => s.activeDomainId);
   const navigateToDomain = useDashboardStore((s) => s.navigateToDomain);
-  const theme = useTheme();
 
   const { nodes, edges } = useMemo(() => {
     if (!domainGraph) return { nodes: [], edges: [] };
@@ -192,7 +190,7 @@ function DomainGraphViewInner() {
           <button
             type="button"
             onClick={() => {
-              useDashboardStore.setState({ activeDomainId: null });
+              useDashboardStore.setState({ activeDomainId: null, selectedNodeId: null });
             }}
             className="px-3 py-1.5 text-xs rounded-lg bg-elevated border border-border-subtle text-text-secondary hover:text-text-primary transition-colors"
           >
@@ -217,14 +215,11 @@ function DomainGraphViewInner() {
           size={1}
           color="var(--color-border-subtle)"
         />
-        <Controls
-          showInteractive={false}
-          style={{ bottom: 16, left: 16 }}
-        />
+        <Controls />
         <MiniMap
-          nodeColor={() => theme.preset.colors.accent ?? "#d4a574"}
-          maskColor="rgba(0,0,0,0.7)"
-          style={{ bottom: 16, right: 16, width: 160, height: 100 }}
+          nodeColor="var(--color-accent)"
+          maskColor="var(--glass-bg)"
+          className="!bg-surface !border !border-border-subtle"
         />
       </ReactFlow>
     </div>
