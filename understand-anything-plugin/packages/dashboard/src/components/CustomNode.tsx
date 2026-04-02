@@ -18,6 +18,9 @@ const typeColors: Record<NodeType, string> = {
   pipeline: "var(--color-node-pipeline)",
   schema: "var(--color-node-schema)",
   resource: "var(--color-node-resource)",
+  domain: "var(--color-node-concept)",
+  flow: "var(--color-node-pipeline)",
+  step: "var(--color-node-function)",
 };
 
 const typeTextColors: Record<NodeType, string> = {
@@ -34,6 +37,9 @@ const typeTextColors: Record<NodeType, string> = {
   pipeline: "text-node-pipeline",
   schema: "text-node-schema",
   resource: "text-node-resource",
+  domain: "text-node-concept",
+  flow: "text-node-pipeline",
+  step: "text-node-function",
 };
 
 const complexityColors: Record<string, string> = {

@@ -9,9 +9,10 @@ import type { ReactFlowInstance } from "@xyflow/react";
 
 export type Persona = "non-technical" | "junior" | "experienced";
 export type NavigationLevel = "overview" | "layer-detail";
-export type NodeType = "file" | "function" | "class" | "module" | "concept" | "config" | "document" | "service" | "table" | "endpoint" | "pipeline" | "schema" | "resource";
+export type NodeType = "file" | "function" | "class" | "module" | "concept" | "config" | "document" | "service" | "table" | "endpoint" | "pipeline" | "schema" | "resource" | "domain" | "flow" | "step";
 export type Complexity = "simple" | "moderate" | "complex";
 export type EdgeCategory = "structural" | "behavioral" | "data-flow" | "dependencies" | "semantic";
+export type ViewMode = "structural" | "domain";
 
 export interface FilterState {
   nodeTypes: Set<NodeType>;
@@ -20,7 +21,7 @@ export interface FilterState {
   edgeCategories: Set<EdgeCategory>;
 }
 
-export const ALL_NODE_TYPES: NodeType[] = ["file", "function", "class", "module", "concept", "config", "document", "service", "table", "endpoint", "pipeline", "schema", "resource"];
+export const ALL_NODE_TYPES: NodeType[] = ["file", "function", "class", "module", "concept", "config", "document", "service", "table", "endpoint", "pipeline", "schema", "resource", "domain", "flow", "step"];
 export const ALL_COMPLEXITIES: Complexity[] = ["simple", "moderate", "complex"];
 export const ALL_EDGE_CATEGORIES: EdgeCategory[] = ["structural", "behavioral", "data-flow", "dependencies", "semantic"];
 
@@ -31,6 +32,8 @@ export const EDGE_CATEGORY_MAP: Record<EdgeCategory, string[]> = {
   dependencies: ["depends_on", "tested_by", "configures"],
   semantic: ["related", "similar_to"],
 };
+
+export const DOMAIN_EDGE_TYPES = ["contains_flow", "flow_step", "cross_domain"];
 
 const DEFAULT_FILTERS: FilterState = {
   nodeTypes: new Set<NodeType>(ALL_NODE_TYPES),
@@ -127,6 +130,15 @@ interface DashboardStore {
   setTourStep: (step: number) => void;
   nextTourStep: () => void;
   prevTourStep: () => void;
+
+  // Domain view
+  viewMode: ViewMode;
+  domainGraph: KnowledgeGraph | null;
+  activeDomainId: string | null;
+
+  setDomainGraph: (graph: KnowledgeGraph) => void;
+  setViewMode: (mode: ViewMode) => void;
+  navigateToDomain: (domainId: string) => void;
 }
 
 function getSortedTour(graph: KnowledgeGraph): TourStep[] {
@@ -441,5 +453,31 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
         ...layerNav,
       });
     }
+  },
+
+  viewMode: "structural",
+  domainGraph: null,
+  activeDomainId: null,
+
+  setDomainGraph: (graph) => {
+    set({ domainGraph: graph, viewMode: "domain" });
+  },
+
+  setViewMode: (mode) => {
+    set({
+      viewMode: mode,
+      selectedNodeId: null,
+      focusNodeId: null,
+      codeViewerOpen: false,
+      codeViewerNodeId: null,
+    });
+  },
+
+  navigateToDomain: (domainId) => {
+    set({
+      activeDomainId: domainId,
+      selectedNodeId: null,
+      focusNodeId: null,
+    });
   },
 }));

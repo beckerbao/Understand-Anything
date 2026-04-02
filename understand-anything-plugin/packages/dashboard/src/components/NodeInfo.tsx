@@ -17,6 +17,9 @@ const typeBadgeColors: Record<NodeType, string> = {
   pipeline: "text-node-pipeline border border-node-pipeline/30 bg-node-pipeline/10",
   schema: "text-node-schema border border-node-schema/30 bg-node-schema/10",
   resource: "text-node-resource border border-node-resource/30 bg-node-resource/10",
+  domain: "text-node-concept border border-node-concept/30 bg-node-concept/10",
+  flow: "text-node-pipeline border border-node-pipeline/30 bg-node-pipeline/10",
+  step: "text-node-function border border-node-function/30 bg-node-function/10",
 };
 
 const complexityBadgeColors: Record<string, string> = {
@@ -56,6 +59,9 @@ const EDGE_LABELS: Record<EdgeType, { forward: string; backward: string }> = {
   routes: { forward: "routes to", backward: "routed from" },
   defines_schema: { forward: "defines schema for", backward: "schema defined by" },
   triggers: { forward: "triggers", backward: "triggered by" },
+  contains_flow: { forward: "contains flow", backward: "flow in" },
+  flow_step: { forward: "flow step", backward: "step of" },
+  cross_domain: { forward: "cross-domain to", backward: "cross-domain from" },
 };
 
 /**
