@@ -26,7 +26,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 
 ## Agent Pipeline
 - Agents write intermediate results to `.understand-anything/intermediate/` on disk (not returned to context)
-- Agent models: sonnet for simple tasks (project-scanner, graph-reviewer), opus for complex (file-analyzer, architecture-analyzer, tour-builder)
+- Agent models: all set to `inherit` for cross-platform compatibility (Claude Code, Cursor, opencode, etc.)
 - `/understand` auto-triggers `/understand-dashboard` after completion
 - Intermediate files cleaned up after graph assembly
 

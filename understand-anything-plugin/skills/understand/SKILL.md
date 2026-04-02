@@ -72,7 +72,7 @@ Determine whether to run a full analysis or incremental update.
 
 ## Phase 1 — SCAN (Full analysis only)
 
-Dispatch a subagent using the prompt template at `./project-scanner-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+Dispatch a subagent using the `project-scanner` agent definition (at `agents/project-scanner.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -124,7 +124,7 @@ Batch the file list from Phase 1 into groups of **20-30 files each** (aim for ~2
 - Non-code files can be mixed with code files in the same batch if batch sizes are small
 - Each file's `fileCategory` from Phase 1 must be included in the batch file list
 
-For each batch, dispatch a subagent using the prompt template at `./file-analyzer-prompt.md`. Run up to **5 subagents concurrently** using parallel dispatch. Pass the template as the subagent's prompt, appending the following additional context:
+For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently** using parallel dispatch. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -202,11 +202,11 @@ Merge all file-analyzer results into a single set of nodes and edges. Then perfo
 ## Phase 4 — ARCHITECTURE
 
 **Build the combined prompt template:**
-1. Read the base template at `./architecture-analyzer-prompt.md`.
+1. Use the `architecture-analyzer` agent definition (at `agents/architecture-analyzer.md`).
 2. **Language context injection:** For each language detected in Phase 1 (e.g., `python`, `markdown`, `dockerfile`, `yaml`, `sql`, `terraform`, `graphql`, `protobuf`, `shell`, `html`, `css`), read the file at `./languages/<language-id>.md` (e.g., `./languages/python.md`, `./languages/dockerfile.md`) and append its content after the base template under a `## Language Context` header. If the file does not exist for a detected language, skip it silently and continue. These files are in the `languages/` subdirectory next to this SKILL.md file. **Include non-code language snippets** — they provide edge patterns and summary styles for non-code files.
 3. **Framework addendum injection:** For each framework detected in Phase 1 (e.g., `Django`), read the file at `./frameworks/<framework-id-lowercase>.md` (e.g., `./frameworks/django.md`) and append its full content after the language context. If the file does not exist for a detected framework, skip it silently and continue. These files are in the `frameworks/` subdirectory next to this SKILL.md file.
 
-Pass the combined content as the subagent's prompt, appending the following additional context:
+Append the language/framework context and the following additional context to the agent's prompt:
 
 > **Additional context from main session:**
 >
@@ -279,7 +279,7 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 
 ## Phase 5 — TOUR
 
-Dispatch a subagent using the prompt template at `./tour-builder-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+Dispatch a subagent using the `tour-builder` agent definition (at `agents/tour-builder.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -468,7 +468,7 @@ If the script exits non-zero, read stderr, fix the script, and retry once.
 
 If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
 
-Dispatch a subagent using the prompt template at `./graph-reviewer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+Dispatch a subagent using the `graph-reviewer` agent definition (at `agents/graph-reviewer.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
