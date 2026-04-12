@@ -25,6 +25,7 @@
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-8A2BE2" alt="Claude Code" /></a>
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
+  <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="https://lum1104.github.io/Understand-Anything"><img src="https://img.shields.io/badge/홈페이지-d4a574" alt="Homepage" /></a>
@@ -197,6 +198,12 @@ GitHub Copilot(v1.108+)이 설치된 VS Code는 `.copilot-plugin/plugin.json`을
 Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
 ```
 
+### Copilot CLI
+
+```bash
+copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
+```
+
 ### Antigravity
 
 Antigravity에 입력하세요:
@@ -228,6 +235,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 | OpenClaw | ✅ 지원 | AI 기반 설치 |
 | Cursor | ✅ 지원 | 자동 인식 |
 | VS Code + GitHub Copilot | ✅ 지원 | 자동 인식 |
+| Copilot CLI | ✅ 지원 | 플러그인 설치 |
 | Antigravity | ✅ 지원 | AI 기반 설치 |
 | Gemini CLI | ✅ 지원 | AI 기반 설치 |
 | Pi Agent | ✅ 지원 | AI 기반 설치 |

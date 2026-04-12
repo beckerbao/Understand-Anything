@@ -25,6 +25,7 @@
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-8A2BE2" alt="Claude Code" /></a>
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
+  <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="https://lum1104.github.io/Understand-Anything"><img src="https://img.shields.io/badge/專案首頁-d4a574" alt="Homepage" /></a>
@@ -197,6 +198,12 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
 ```
 
+### Copilot CLI
+
+```bash
+copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
+```
+
 ### Antigravity
 
 告訴 Antigravity：
@@ -228,6 +235,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 | OpenClaw | ✅ 支援 | AI 驅動安裝 |
 | Cursor | ✅ 支援 | 自動發現 |
 | VS Code + GitHub Copilot | ✅ 支援 | 自動發現 |
+| Copilot CLI | ✅ 支援 | 外掛程式安裝 |
 | Antigravity | ✅ 支援 | AI 驅動安裝 |
 | Gemini CLI | ✅ 支援 | AI 驅動安裝 |
 | Pi Agent | ✅ 支援 | AI 驅動安裝 |
