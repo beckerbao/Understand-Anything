@@ -289,14 +289,8 @@ export class GraphBuilder {
 
     // Create child nodes for definitions (tables, schemas, etc.)
     for (const def of meta.definitions ?? []) {
-      const childId = `${def.kind}:${filePath}:${def.name}`;
-      if (this.nodeIds.has(childId)) {
-        console.warn(`[GraphBuilder] Duplicate node ID "${childId}" — skipping`);
-        continue;
-      }
-      this.nodeIds.add(childId);
-      this.nodes.push({
-        id: childId,
+      this.addChildNode({
+        id: `${def.kind}:${filePath}:${def.name}`,
         type: this.mapKindToNodeType(def.kind),
         name: def.name,
         filePath,
@@ -304,41 +298,27 @@ export class GraphBuilder {
         summary: `${def.kind}: ${def.name} (${def.fields.length} fields)`,
         tags: [],
         complexity: meta.complexity,
-      });
-      this.edges.push({ source: fileId, target: childId, type: "contains", direction: "forward", weight: 1 });
+      }, fileId);
     }
 
     // Create child nodes for services
     for (const svc of meta.services ?? []) {
-      const childId = `service:${filePath}:${svc.name}`;
-      if (this.nodeIds.has(childId)) {
-        console.warn(`[GraphBuilder] Duplicate node ID "${childId}" — skipping`);
-        continue;
-      }
-      this.nodeIds.add(childId);
-      this.nodes.push({
-        id: childId,
+      this.addChildNode({
+        id: `service:${filePath}:${svc.name}`,
         type: "service",
         name: svc.name,
         filePath,
         summary: `Service ${svc.name}${svc.image ? ` (image: ${svc.image})` : ""}`,
         tags: [],
         complexity: meta.complexity,
-      });
-      this.edges.push({ source: fileId, target: childId, type: "contains", direction: "forward", weight: 1 });
+      }, fileId);
     }
 
     // Create child nodes for endpoints
     for (const ep of meta.endpoints ?? []) {
-      const childId = `endpoint:${filePath}:${ep.path}`;
-      if (this.nodeIds.has(childId)) {
-        console.warn(`[GraphBuilder] Duplicate node ID "${childId}" — skipping`);
-        continue;
-      }
-      const name = `${ep.method ?? ""} ${ep.path}`.trim()
-      this.nodeIds.add(childId);
-      this.nodes.push({
-        id: childId,
+      const name = `${ep.method ?? ""} ${ep.path}`.trim();
+      this.addChildNode({
+        id: `endpoint:${filePath}:${ep.path}`,
         type: "endpoint",
         name,
         filePath,
@@ -346,20 +326,13 @@ export class GraphBuilder {
         summary: `Endpoint: ${name}`,
         tags: [],
         complexity: meta.complexity,
-      });
-      this.edges.push({ source: fileId, target: childId, type: "contains", direction: "forward", weight: 1 });
+      }, fileId);
     }
 
     // Create child nodes for steps (pipeline/makefile targets)
     for (const step of meta.steps ?? []) {
-      const childId = `step:${filePath}:${step.name}`;
-      if (this.nodeIds.has(childId)) {
-        console.warn(`[GraphBuilder] Duplicate node ID "${childId}" — skipping`);
-        continue;
-      }
-      this.nodeIds.add(childId);
-      this.nodes.push({
-        id: childId,
+      this.addChildNode({
+        id: `step:${filePath}:${step.name}`,
         type: "pipeline",
         name: step.name,
         filePath,
@@ -367,20 +340,13 @@ export class GraphBuilder {
         summary: `Step: ${step.name}`,
         tags: [],
         complexity: meta.complexity,
-      });
-      this.edges.push({ source: fileId, target: childId, type: "contains", direction: "forward", weight: 1 });
+      }, fileId);
     }
 
     // Create child nodes for resources (Terraform, etc.)
     for (const res of meta.resources ?? []) {
-      const childId = `resource:${filePath}:${res.name}`;
-      if (this.nodeIds.has(childId)) {
-        console.warn(`[GraphBuilder] Duplicate node ID "${childId}" — skipping`);
-        continue;
-      }
-      this.nodeIds.add(childId);
-      this.nodes.push({
-        id: childId,
+      this.addChildNode({
+        id: `resource:${filePath}:${res.name}`,
         type: "resource",
         name: res.name,
         filePath,
@@ -388,9 +354,18 @@ export class GraphBuilder {
         summary: `Resource: ${res.name} (${res.kind})`,
         tags: [],
         complexity: meta.complexity,
-      });
-      this.edges.push({ source: fileId, target: childId, type: "contains", direction: "forward", weight: 1 });
+      }, fileId);
     }
+  }
+
+  private addChildNode(node: GraphNode, parentId: string): void {
+    if (this.nodeIds.has(node.id)) {
+      console.warn(`[GraphBuilder] Duplicate node ID "${node.id}" — skipping`);
+      return;
+    }
+    this.nodeIds.add(node.id);
+    this.nodes.push(node);
+    this.edges.push({ source: parentId, target: node.id, type: "contains", direction: "forward", weight: 1 });
   }
 
   private mapKindToNodeType(kind: string): GraphNode["type"] {
