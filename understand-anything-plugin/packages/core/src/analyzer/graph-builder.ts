@@ -135,13 +135,17 @@ export class GraphBuilder {
     this.gitHash = gitHash;
   }
 
+  private static basename(filePath: string): string {
+    return GraphBuilder.basename(filePath);
+  }
+
   addFile(filePath: string, meta: FileMeta): void {
     const lang = detectLanguage(filePath);
     if (lang !== "unknown") {
       this.languages.add(lang);
     }
 
-    const name = filePath.split("/").pop() ?? filePath;
+    const name = GraphBuilder.basename(filePath);
 
     const id = `file:${filePath}`;
     this.nodeIds.add(id);
@@ -166,7 +170,7 @@ export class GraphBuilder {
       this.languages.add(lang);
     }
 
-    const fileName = filePath.split("/").pop() ?? filePath;
+    const fileName = GraphBuilder.basename(filePath);
     const fileId = `file:${filePath}`;
 
     // Create the file node
@@ -258,7 +262,7 @@ export class GraphBuilder {
   addNonCodeFile(filePath: string, meta: NonCodeFileMeta): void {
     const lang = detectLanguage(filePath);
     if (lang !== "unknown") this.languages.add(lang);
-    const name = filePath.split("/").pop() ?? filePath;
+    const name = GraphBuilder.basename(filePath);
     const id = `${meta.nodeType ?? "file"}:${filePath}`;
     this.nodeIds.add(id);
     this.nodes.push({
