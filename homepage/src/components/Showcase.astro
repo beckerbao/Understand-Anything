@@ -1,6 +1,6 @@
 ---
 const base = import.meta.env.BASE_URL;   /* /Understand-Anything/ in prod */
-const demoUrl = `${base}demo/index.html`;
+const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
 ---
 
 <!-- Live Demo -->
