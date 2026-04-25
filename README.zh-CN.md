@@ -43,7 +43,7 @@
 
 **当你刚加入一个新团队，面对 20 万行代码，你从哪里开始？**
 
-Understand Anything 是一个基于 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 的插件，通过多智能体（multi-agent）架构分析你的项目，构建包含文件、函数、类以及依赖关系的知识图谱，并提供一个可视化交互界面，帮助你理解整个系统。不再”盲读代码”，而是从全局视角理解系统结构。
+Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/en/plugins-reference#plugins-reference)，通过多智能体（multi-agent）架构分析你的项目，构建包含文件、函数、类以及依赖关系的知识图谱，并提供一个可视化交互界面，帮助你理解整个系统。不再”盲读代码”，而是从全局视角理解系统结构。
 
 > **寓教于乐的图表 > 仅为炫技的图表。**
 

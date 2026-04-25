@@ -44,7 +44,7 @@
 
 **Yeni bir ekibe katıldın. Kod tabanı 200.000 satır kod. Nereden başlayacaksın bile bilemiyorsun?**
 
-Understand Anything, projenizi çok-ajan hattıyla analiz eden, her dosya, fonksiyon, sınıf ve bağımlılığın bilgi grafiğini oluşturan ve hepsini görsel olarak keşfetmen için interaktif bir kontrol paneli sunan bir [Claude Code](https://docs.anthropic.com/en/docs/claude-code) eklentisidir. Kodu körü körüne okumayı bırak. Büyük resmi görmeye başla.
+Understand Anything, projenizi çok-ajan hattıyla analiz eden, her dosya, fonksiyon, sınıf ve bağımlılığın bilgi grafiğini oluşturan ve hepsini görsel olarak keşfetmen için interaktif bir kontrol paneli sunan bir [Claude Code Plugin](https://code.claude.com/docs/en/plugins-reference#plugins-reference)'dir. Kodu körü körüne okumayı bırak. Büyük resmi görmeye başla.
 
 > **Öğreten grafikler > sadece gösteriş yapan grafikler.**
 

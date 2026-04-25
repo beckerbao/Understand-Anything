@@ -43,7 +43,7 @@
 
 **새 팀에 합류했습니다. 코드베이스가 20만 줄입니다. 어디서부터 시작하시겠습니까?**
 
-Understand Anything은 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 플러그인으로, 멀티 에이전트 파이프라인을 통해 프로젝트를 분석하고, 모든 파일, 함수, 클래스, 의존성에 대한 지식 그래프를 구축한 뒤, 이를 시각적으로 탐색할 수 있는 인터랙티브 대시보드를 제공합니다. 더 이상 코드를 맹목적으로 읽지 마세요. 전체 그림을 파악하세요.
+Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plugins-reference#plugins-reference)으로, 멀티 에이전트 파이프라인을 통해 프로젝트를 분석하고, 모든 파일, 함수, 클래스, 의존성에 대한 지식 그래프를 구축한 뒤, 이를 시각적으로 탐색할 수 있는 인터랙티브 대시보드를 제공합니다. 더 이상 코드를 맹목적으로 읽지 마세요. 전체 그림을 파악하세요.
 
 > **배움을 주는 그래프 > 과시만 하는 그래프.**
 
