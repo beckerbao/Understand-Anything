@@ -13,6 +13,7 @@ import FilterPanel from "./components/FilterPanel";
 import ExportMenu from "./components/ExportMenu";
 import PersonaSelector from "./components/PersonaSelector";
 import ProjectOverview from "./components/ProjectOverview";
+import FileExplorer from "./components/FileExplorer";
 import WarningBanner from "./components/WarningBanner";
 import TokenGate from "./components/TokenGate";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -31,6 +32,7 @@ const KeyboardShortcutsHelp = lazy(
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const SESSION_TOKEN_KEY = "understand-anything-token";
+type SidebarTab = "info" | "files";
 
 /** Resolve data file URL — in demo mode, use env var URLs; otherwise use local paths with token. */
 function dataUrl(fileName: string, token: string | null): string {
@@ -97,7 +99,9 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const tourActive = useDashboardStore((s) => s.tourActive);
   const persona = useDashboardStore((s) => s.persona);
   const codeViewerOpen = useDashboardStore((s) => s.codeViewerOpen);
-  const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const codeViewerExpanded = useDashboardStore((s) => s.codeViewerExpanded);
+  const expandCodeViewer = useDashboardStore((s) => s.expandCodeViewer);
+  const collapseCodeViewer = useDashboardStore((s) => s.collapseCodeViewer);
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
   const togglePathFinder = useDashboardStore((s) => s.togglePathFinder);
@@ -107,6 +111,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("info");
   const viewMode = useDashboardStore((s) => s.viewMode);
   const setViewMode = useDashboardStore((s) => s.setViewMode);
   const isKnowledgeGraph = useDashboardStore((s) => s.isKnowledgeGraph);
@@ -121,6 +126,10 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (selectedNodeId) setSidebarTab("info");
+  }, [selectedNodeId]);
 
   // Define keyboard shortcuts
   const shortcuts = useMemo<KeyboardShortcut[]>(
@@ -146,6 +155,8 @@ function Dashboard({ accessToken }: { accessToken: string }) {
             state.toggleFilterPanel();
           } else if (state.exportMenuOpen) {
             state.toggleExportMenu();
+          } else if (state.codeViewerExpanded) {
+            state.collapseCodeViewer();
           } else if (state.codeViewerOpen) {
             state.closeCodeViewer();
           } else if (state.selectedNodeId) {
@@ -322,7 +333,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   // NodeInfo always takes priority when a node is selected.
   // Learn mode adds LearnPanel below it; otherwise ProjectOverview shows when idle.
   const isLearnMode = tourActive || persona === "junior";
-  const sidebarContent = (
+  const infoSidebarContent = (
     <>
       {selectedNodeId && <NodeInfo />}
       {isLearnMode && (
@@ -332,6 +343,30 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       )}
       {!selectedNodeId && !isLearnMode && <ProjectOverview />}
     </>
+  );
+
+  const sidebarContent = (
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex items-center gap-1 p-2 border-b border-border-subtle bg-surface shrink-0">
+        {(["info", "files"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setSidebarTab(tab)}
+            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ${
+              sidebarTab === tab
+                ? "bg-accent/15 text-accent"
+                : "text-text-muted hover:text-text-primary hover:bg-elevated"
+            }`}
+          >
+            {tab === "info" ? "Info" : "Files"}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {sidebarTab === "files" ? <FileExplorer /> : infoSidebarContent}
+      </div>
+    </div>
   );
 
   return (
@@ -503,27 +538,36 @@ function Dashboard({ accessToken }: { accessToken: string }) {
           {sidebarContent}
         </aside>
 
-        {/* Code viewer overlay */}
-        {codeViewerOpen && (
-          <div className="absolute bottom-0 left-0 right-0 h-[25vh] bg-surface border-t border-border-subtle animate-slide-up z-20">
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-end px-3 py-1 shrink-0">
-                <button
-                  onClick={closeCodeViewer}
-                  className="text-text-muted hover:text-text-primary text-xs transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="flex-1 min-h-0">
-                <Suspense fallback={null}>
-                  <CodeViewer />
-                </Suspense>
-              </div>
-            </div>
+        {/* Code viewer slide-up overlay (collapsed state) */}
+        {codeViewerOpen && !codeViewerExpanded && (
+          <div className="absolute bottom-0 left-0 right-0 h-[40vh] bg-surface border-t border-border-subtle animate-slide-up z-20 overflow-hidden">
+            <Suspense fallback={null}>
+              <CodeViewer accessToken={accessToken} onExpand={expandCodeViewer} />
+            </Suspense>
           </div>
         )}
       </div>
+
+      {/* Expanded code viewer modal */}
+      {codeViewerOpen && codeViewerExpanded && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6"
+          onMouseDown={collapseCodeViewer}
+        >
+          <div
+            className="w-[calc(100vw-32px)] max-w-[1120px] h-[calc(100vh-32px)] sm:h-[calc(100vh-48px)] max-h-[820px] rounded-lg border border-border-medium bg-surface shadow-2xl overflow-hidden"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Suspense fallback={null}>
+              <CodeViewer
+                accessToken={accessToken}
+                presentation="modal"
+                onClose={collapseCodeViewer}
+              />
+            </Suspense>
+          </div>
+        </div>
+      )}
 
       {/* Keyboard shortcuts help modal */}
       {showKeyboardHelp && (

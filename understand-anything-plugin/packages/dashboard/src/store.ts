@@ -74,6 +74,7 @@ interface DashboardStore {
 
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
+  codeViewerExpanded: boolean;
 
   tourActive: boolean;
   currentTourStep: number;
@@ -115,6 +116,8 @@ interface DashboardStore {
   setPersona: (persona: Persona) => void;
   openCodeViewer: (nodeId: string) => void;
   closeCodeViewer: () => void;
+  expandCodeViewer: () => void;
+  collapseCodeViewer: () => void;
 
   setDiffOverlay: (changed: string[], affected: string[]) => void;
   toggleDiffMode: () => void;
@@ -180,6 +183,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   activeLayerId: null,
   codeViewerOpen: false,
   codeViewerNodeId: null,
+  codeViewerExpanded: false,
 
   tourActive: false,
   currentTourStep: 0,
@@ -264,6 +268,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
         focusNodeId: null,
         codeViewerOpen: false,
         codeViewerNodeId: null,
+        codeViewerExpanded: false,
         nodeHistory: newHistory,
       });
     } else {
@@ -316,6 +321,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       focusNodeId: null,
       codeViewerOpen: false,
       codeViewerNodeId: null,
+      codeViewerExpanded: false,
     }),
 
   navigateToOverview: () =>
@@ -326,6 +332,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       focusNodeId: null,
       codeViewerOpen: false,
       codeViewerNodeId: null,
+      codeViewerExpanded: false,
     }),
 
   setFocusNode: (nodeId) => set({ focusNodeId: nodeId, selectedNodeId: nodeId }),
@@ -346,8 +353,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   setPersona: (persona) => set({ persona }),
 
-  openCodeViewer: (nodeId) => set({ codeViewerOpen: true, codeViewerNodeId: nodeId }),
-  closeCodeViewer: () => set({ codeViewerOpen: false, codeViewerNodeId: null }),
+  openCodeViewer: (nodeId) =>
+    set({ codeViewerOpen: true, codeViewerNodeId: nodeId, codeViewerExpanded: false }),
+  closeCodeViewer: () =>
+    set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
+  expandCodeViewer: () => set({ codeViewerExpanded: true }),
+  collapseCodeViewer: () => set({ codeViewerExpanded: false }),
 
   setDiffOverlay: (changed, affected) =>
     set({
@@ -486,6 +497,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       focusNodeId: null,
       codeViewerOpen: false,
       codeViewerNodeId: null,
+      codeViewerExpanded: false,
     });
   },
 

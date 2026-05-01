@@ -9,6 +9,171 @@ import crypto from "crypto";
 // This token is printed to the terminal and must be in the URL
 // to fetch knowledge-graph.json or diff-overlay.json.
 const ACCESS_TOKEN = crypto.randomBytes(16).toString("hex");
+const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
+
+function graphFileCandidates(fileName: string): string[] {
+  const graphDir = process.env.GRAPH_DIR;
+  return [
+    ...(graphDir
+      ? [path.resolve(graphDir, `.understand-anything/${fileName}`)]
+      : []),
+    path.resolve(process.cwd(), `.understand-anything/${fileName}`),
+    path.resolve(process.cwd(), `../../../.understand-anything/${fileName}`),
+  ];
+}
+
+function findGraphFile(fileName: string): string | null {
+  return graphFileCandidates(fileName).find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+function projectRootFromGraphFile(candidate: string): string {
+  return path.dirname(path.dirname(candidate));
+}
+
+function normalizeGraphPath(filePath: string, projectRoot: string): string | null {
+  const rawPath = path.isAbsolute(filePath)
+    ? filePath.startsWith(projectRoot)
+      ? path.relative(projectRoot, filePath)
+      : null
+    : filePath;
+  if (rawPath === null) return null;
+  const normalized = path.normalize(rawPath);
+  if (
+    !normalized ||
+    normalized === "." ||
+    normalized.includes("\0") ||
+    normalized === ".." ||
+    normalized.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(normalized)
+  ) {
+    return null;
+  }
+  return normalized.split(path.sep).join("/");
+}
+
+function graphFilePathSet(graphFile: string, projectRoot: string): Set<string> {
+  const allowed = new Set<string>();
+  try {
+    const raw = JSON.parse(fs.readFileSync(graphFile, "utf-8")) as {
+      nodes?: Array<Record<string, unknown>>;
+    };
+    for (const node of raw.nodes ?? []) {
+      if (typeof node.filePath !== "string") continue;
+      const normalized = normalizeGraphPath(node.filePath, projectRoot);
+      if (normalized) allowed.add(normalized);
+    }
+  } catch {
+    return allowed;
+  }
+  return allowed;
+}
+
+function detectLanguage(filePath: string): string {
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+  const byExt: Record<string, string> = {
+    bash: "bash",
+    c: "c",
+    cc: "cpp",
+    cpp: "cpp",
+    cs: "csharp",
+    css: "css",
+    go: "go",
+    h: "c",
+    hpp: "cpp",
+    html: "markup",
+    java: "java",
+    js: "javascript",
+    jsx: "jsx",
+    json: "json",
+    md: "markdown",
+    mjs: "javascript",
+    py: "python",
+    rb: "ruby",
+    rs: "rust",
+    sh: "bash",
+    ts: "typescript",
+    tsx: "tsx",
+    txt: "text",
+    yaml: "yaml",
+    yml: "yaml",
+  };
+  return byExt[ext] ?? "text";
+}
+
+function sendJson(res: import("http").ServerResponse, statusCode: number, payload: unknown) {
+  res.statusCode = statusCode;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(payload));
+}
+
+function rejectFileRequest(message: string, statusCode = 400) {
+  return { statusCode, payload: { error: message } };
+}
+
+function readSourceFile(url: URL) {
+  const requestedPath = url.searchParams.get("path") ?? "";
+  if (!requestedPath) return rejectFileRequest("Missing path");
+  if (requestedPath.includes("\0")) return rejectFileRequest("Invalid path");
+  if (path.isAbsolute(requestedPath)) return rejectFileRequest("Absolute paths are not allowed");
+
+  const normalizedPath = path.normalize(requestedPath);
+  if (
+    normalizedPath === "." ||
+    normalizedPath.startsWith(`..${path.sep}`) ||
+    normalizedPath === ".." ||
+    path.isAbsolute(normalizedPath)
+  ) {
+    return rejectFileRequest("Path must stay inside the project");
+  }
+
+  const graphFile = findGraphFile("knowledge-graph.json");
+  if (!graphFile) {
+    return rejectFileRequest("No knowledge graph found. Run /understand first.", 404);
+  }
+
+  const projectRoot = projectRootFromGraphFile(graphFile);
+  const absoluteFile = path.resolve(projectRoot, normalizedPath);
+  const relativeToRoot = path.relative(projectRoot, absoluteFile);
+  if (
+    !relativeToRoot ||
+    relativeToRoot.startsWith(`..${path.sep}`) ||
+    relativeToRoot === ".." ||
+    path.isAbsolute(relativeToRoot)
+  ) {
+    return rejectFileRequest("Path must stay inside the project");
+  }
+  const safeRelativePath = relativeToRoot.split(path.sep).join("/");
+  if (!graphFilePathSet(graphFile, projectRoot).has(safeRelativePath)) {
+    return rejectFileRequest("File is not in the knowledge graph", 404);
+  }
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(absoluteFile);
+  } catch {
+    return rejectFileRequest("File not found", 404);
+  }
+
+  if (!stat.isFile()) return rejectFileRequest("Path is not a file");
+  if (stat.size > MAX_SOURCE_FILE_BYTES) {
+    return rejectFileRequest("File is too large to preview", 413);
+  }
+
+  const buffer = fs.readFileSync(absoluteFile);
+  if (buffer.includes(0)) return rejectFileRequest("Binary files cannot be previewed", 415);
+
+  const content = buffer.toString("utf8");
+  return {
+    statusCode: 200,
+    payload: {
+      path: safeRelativePath,
+      language: detectLanguage(relativeToRoot),
+      content,
+      sizeBytes: buffer.byteLength,
+      lineCount: content.length === 0 ? 0 : content.split(/\r\n|\n|\r/).length,
+    },
+  };
+}
 
 export default defineConfig({
   // FIX 1 — bind only to localhost, not 0.0.0.0
@@ -62,8 +227,10 @@ export default defineConfig({
       configureServer(server) {
         // Print the access URL once so the developer can open it.
         server.httpServer?.once("listening", () => {
+          const address = server.httpServer?.address();
+          const port = typeof address === "object" && address ? address.port : 5173;
           console.log(
-            `\n  🔑  Dashboard URL: http://127.0.0.1:5173?token=${ACCESS_TOKEN}\n`
+            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}?token=${ACCESS_TOKEN}\n`
           );
         });
 
@@ -74,7 +241,8 @@ export default defineConfig({
             pathname === "/knowledge-graph.json" ||
             pathname === "/domain-graph.json" ||
             pathname === "/diff-overlay.json" ||
-            pathname === "/meta.json";
+            pathname === "/meta.json" ||
+            pathname === "/file-content.json";
 
           if (!isProtectedEndpoint) {
             next();
@@ -84,9 +252,13 @@ export default defineConfig({
           // FIX 3 — require the one-time token on all data endpoints.
           // Requests without a matching ?token= get a 403.
           if (url.searchParams.get("token") !== ACCESS_TOKEN) {
-            res.statusCode = 403;
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ error: "Forbidden: missing or invalid token" }));
+            sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
+            return;
+          }
+
+          if (pathname === "/file-content.json") {
+            const result = readSourceFile(url);
+            sendJson(res, result.statusCode, result.payload);
             return;
           }
 
@@ -99,17 +271,7 @@ export default defineConfig({
               ? "domain-graph.json"
               : "knowledge-graph.json";
 
-          const graphDir = process.env.GRAPH_DIR;
-          const candidates = [
-            ...(graphDir
-              ? [path.resolve(graphDir, `.understand-anything/${fileName}`)]
-              : []),
-            path.resolve(process.cwd(), `.understand-anything/${fileName}`),
-            path.resolve(
-              process.cwd(),
-              `../../../.understand-anything/${fileName}`
-            ),
-          ];
+          const candidates = graphFileCandidates(fileName);
 
           for (const candidate of candidates) {
             if (!fs.existsSync(candidate)) continue;
@@ -126,12 +288,7 @@ export default defineConfig({
 
               // Derive the project root from the candidate path so we can
               // make file paths relative to it.
-              const projectRoot = path.dirname(
-                candidate.replace(
-                  `${path.sep}.understand-anything${path.sep}${fileName}`,
-                  ""
-                )
-              );
+              const projectRoot = projectRootFromGraphFile(candidate);
 
               if (Array.isArray(raw.nodes)) {
                 raw.nodes = raw.nodes.map((node) => {

@@ -20,8 +20,8 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - Dark luxury theme: deep blacks (#0a0a0a), gold/amber accents (#d4a574), DM Serif Display typography
 - Graph-first layout: 75% graph + 360px right sidebar
 - No ChatPanel or Monaco Editor
-- Sidebar: ProjectOverview (default) → NodeInfo (node selected) → LearnPanel (Learn persona)
-- Code viewer: styled summary overlay (slides up from bottom on file node click)
+- Sidebar tabs: `Info` (ProjectOverview default → NodeInfo when node selected → LearnPanel in Learn persona, composing) and `Files` (FileExplorer tree built from the structural graph)
+- Code viewer: prism-react-renderer source viewer that slides up from the bottom on file node click; an expand button promotes it into a full-screen modal. Source content is fetched from the dev server's `/file-content.json` endpoint, gated by access token + a graph-derived path allowlist
 - Schema validation on graph load with error banner
 
 ## Agent Pipeline

@@ -310,6 +310,7 @@ export default function NodeInfo() {
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
   const navigateToHistoryIndex = useDashboardStore((s) => s.navigateToHistoryIndex);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const openCodeViewer = useDashboardStore((s) => s.openCodeViewer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
@@ -427,14 +428,27 @@ export default function NodeInfo() {
       </p>
 
       {node.filePath && (
-        <div className="text-xs text-text-secondary mb-2">
-          <span className="font-medium text-text-muted">File:</span>{" "}
-          {node.filePath}
-          {node.lineRange && (
-            <span className="ml-2">
-              (L{node.lineRange[0]}-{node.lineRange[1]})
-            </span>
-          )}
+        <div className="text-xs text-text-secondary mb-4 rounded-lg border border-border-subtle bg-elevated/60 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-medium text-text-muted mb-1">File</div>
+              <div className="font-mono truncate" title={node.filePath}>
+                {node.filePath}
+                {node.lineRange && (
+                  <span className="ml-2 text-text-muted">
+                    L{node.lineRange[0]}-{node.lineRange[1]}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openCodeViewer(node.id)}
+              className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded border border-accent/30 text-accent hover:text-accent-bright hover:border-accent/60 transition-colors"
+            >
+              Open code
+            </button>
+          </div>
         </div>
       )}
 
