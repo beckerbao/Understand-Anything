@@ -187,7 +187,7 @@ export function applyForceLayout(
 // ELK helpers
 // ---------------------------------------------------------------------------
 
-const ELK_DEFAULT_LAYOUT_OPTIONS: Record<string, string> = {
+export const ELK_DEFAULT_LAYOUT_OPTIONS: Record<string, string> = {
   algorithm: "layered",
   "elk.direction": "DOWN",
   "elk.layered.spacing.nodeNodeBetweenLayers": "80",

@@ -19,32 +19,39 @@ import LayerClusterNode from "./LayerClusterNode";
 import type { LayerClusterFlowNode } from "./LayerClusterNode";
 import PortalNode from "./PortalNode";
 import type { PortalFlowNode } from "./PortalNode";
+import ContainerNode from "./ContainerNode";
+import type { ContainerFlowNode } from "./ContainerNode";
 import Breadcrumb from "./Breadcrumb";
 import { useDashboardStore } from "../store";
-import type { KnowledgeGraph, NodeType } from "@understand-anything/core/types";
+import type { GraphEdge, KnowledgeGraph, NodeType } from "@understand-anything/core/types";
 import { useTheme } from "../themes/index.ts";
 import {
-  applyDagreLayout,
   NODE_WIDTH,
   NODE_HEIGHT,
   LAYER_CLUSTER_WIDTH,
   LAYER_CLUSTER_HEIGHT,
   PORTAL_NODE_WIDTH,
   PORTAL_NODE_HEIGHT,
+  ELK_DEFAULT_LAYOUT_OPTIONS,
   nodesToElkInput,
   mergeElkPositions,
 } from "../utils/layout";
 import { applyElkLayout } from "../utils/elk-layout";
+import type { ElkChild, ElkEdge, ElkInput } from "../utils/elk-layout";
 import {
+  aggregateContainerEdges,
   aggregateLayerEdges,
   computePortals,
   findCrossLayerFileNodes,
 } from "../utils/edgeAggregation";
+import { deriveContainers } from "../utils/containers";
+import type { DerivedContainer } from "../utils/containers";
 
 const nodeTypes = {
   custom: CustomNode,
   "layer-cluster": LayerClusterNode,
   portal: PortalNode,
+  container: ContainerNode,
 };
 
 import type { NodeCategory } from "../store";
@@ -249,14 +256,39 @@ function useOverviewGraph() {
   return overview;
 }
 
-// ── Layer detail level: topology (dagre) + visual overlay ───────────────
+// ── Layer detail level: topology (ELK Stage 1) + visual overlay ─────────
+
+interface LayerDetailTopology {
+  nodes: Node[];
+  edges: Edge[];
+  portalNodes: PortalFlowNode[];
+  portalEdges: Edge[];
+  filteredEdges: KnowledgeGraph["edges"];
+  containers: DerivedContainer[];
+  nodeToContainer: Map<string, string>;
+  intraContainer: GraphEdge[];
+}
+
+const EMPTY_TOPOLOGY: LayerDetailTopology = {
+  nodes: [],
+  edges: [],
+  portalNodes: [],
+  portalEdges: [],
+  filteredEdges: [],
+  containers: [],
+  nodeToContainer: new Map(),
+  intraContainer: [],
+};
 
 /**
- * Topology memo: computes node positions via dagre. Only recomputes when
- * the graph structure, active layer, persona, diff, or focus changes.
- * Does NOT depend on selectedNodeId, searchResults, or tourHighlightedNodeIds.
+ * Topology hook: derives containers, aggregates inter-container edges, then
+ * runs Stage 1 ELK on container atoms (no children rendered yet — Task 12
+ * lazy-expands them). Only recomputes when the graph structure, active
+ * layer, persona, diff state, focus, or filters change. Does NOT depend on
+ * selectedNodeId, searchResults, tourHighlightedNodeIds, or
+ * expandedContainers (Stage 2 concern).
  */
-function useLayerDetailTopology() {
+function useLayerDetailTopology(): LayerDetailTopology {
   const graph = useDashboardStore((s) => s.graph);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
@@ -275,18 +307,19 @@ function useLayerDetailTopology() {
     [selectNode],
   );
 
-  return useMemo(() => {
-    if (!graph || !activeLayerId)
-      return { nodes: [] as CustomFlowNode[], edges: [] as Edge[], portalNodes: [] as PortalFlowNode[], portalEdges: [] as Edge[], filteredEdges: [] as KnowledgeGraph["edges"] };
+  // ── Structural build (synchronous): filtering + containers + nodes/edges
+  // pre-layout. Re-runs whenever the inputs that drive container derivation
+  // change. The only async piece is the ELK call below.
+  const built = useMemo(() => {
+    if (!graph || !activeLayerId) return null;
 
     const activeLayer = graph.layers.find((l) => l.id === activeLayerId);
-    if (!activeLayer) return { nodes: [] as CustomFlowNode[], edges: [] as Edge[], portalNodes: [] as PortalFlowNode[], portalEdges: [] as Edge[], filteredEdges: [] as KnowledgeGraph["edges"] };
+    if (!activeLayer) return null;
 
     const layerNodeIds = new Set(activeLayer.nodeIds);
 
-    // Expand layer membership to include sub-file nodes (function/class) whose
-    // parent file is in this layer. These nodes aren't in layer.nodeIds directly
-    // but belong to the layer via their "contains" edge from a file node.
+    // Expand layer membership to include sub-file nodes (function/class)
+    // whose parent file is in this layer. Joined via "contains" edges.
     const expandedLayerNodeIds = new Set(layerNodeIds);
     for (const edge of graph.edges) {
       if (edge.type === "contains" && layerNodeIds.has(edge.source)) {
@@ -294,8 +327,6 @@ function useLayerDetailTopology() {
       }
     }
 
-    // All node types visible at each persona level (single source of truth).
-    // Sub-file types (function, class) are only shown for junior/experienced.
     const subFileTypes = new Set(["function", "class"]);
     const allVisibleTypes = new Set([
       "file", "module", "concept",
@@ -312,7 +343,6 @@ function useLayerDetailTopology() {
       return true;
     });
 
-    // Apply node type category filters
     filteredGraphNodes = filteredGraphNodes.filter((n) => {
       const category = NODE_TYPE_TO_CATEGORY[n.type as NodeType];
       if (!category) {
@@ -346,70 +376,106 @@ function useLayerDetailTopology() {
       );
     }
 
-    const diffNodeIds = diffMode
-      ? new Set([...changedNodeIds, ...affectedNodeIds])
-      : new Set<string>();
+    // Derive containers + bucket edges
+    const { containers, ungrouped } = deriveContainers(
+      filteredGraphNodes,
+      filteredGraphEdges,
+    );
+    const ungroupedSet = new Set(ungrouped);
+    const nodeToContainer = new Map<string, string>();
+    for (const c of containers) {
+      for (const id of c.nodeIds) nodeToContainer.set(id, c.id);
+    }
+    // Ungrouped nodes are their own atoms — register them so edge
+    // aggregation treats inter-(container,ungrouped) edges as cross-atom.
+    for (const id of ungroupedSet) {
+      nodeToContainer.set(id, id);
+    }
+    const { intraContainer, interContainerAggregated } = aggregateContainerEdges(
+      filteredGraphEdges,
+      nodeToContainer,
+    );
 
-    const flowNodes: CustomFlowNode[] = filteredGraphNodes.map((node) => ({
-      id: node.id,
-      type: "custom" as const,
+    // Container size estimate (size memory takes priority)
+    const sizeMemory = useDashboardStore.getState().containerSizeMemory;
+    const containerWidth = (c: DerivedContainer) =>
+      sizeMemory.get(c.id)?.width ??
+      Math.max(NODE_WIDTH, Math.sqrt(c.nodeIds.length) * NODE_WIDTH * 1.2);
+    const containerHeight = (c: DerivedContainer) =>
+      sizeMemory.get(c.id)?.height ??
+      Math.max(NODE_HEIGHT, Math.sqrt(c.nodeIds.length) * NODE_HEIGHT * 1.2);
+
+    // Build container flow nodes (children NOT rendered yet — Task 12)
+    const containerFlowNodes: ContainerFlowNode[] = containers.map((c, idx) => ({
+      id: c.id,
+      type: "container" as const,
       position: { x: 0, y: 0 },
+      width: containerWidth(c),
+      height: containerHeight(c),
       data: {
-        label: node.name ?? node.filePath?.split("/").pop() ?? node.id,
-        nodeType: node.type,
-        summary: node.summary,
-        complexity: node.complexity,
-        isHighlighted: false,
-        searchScore: undefined,
-        isSelected: false,
-        isTourHighlighted: false,
-        isDiffChanged: diffMode && changedNodeIds.has(node.id),
-        isDiffAffected: diffMode && affectedNodeIds.has(node.id),
-        isDiffFaded: diffMode && !changedNodeIds.has(node.id) && !affectedNodeIds.has(node.id),
-        isNeighbor: false,
-        isSelectionFaded: false,
-        onNodeClick: handleNodeSelect,
+        containerId: c.id,
+        name: c.name,
+        childCount: c.nodeIds.length,
+        strategy: c.strategy,
+        colorIndex: idx % 12,
+        isExpanded: false,
+        hasSearchHits: false,
+        isDiffAffected: false, // Task 14 will populate this
+        isFocusedViaChild: false,
+        onToggle: (id: string) => useDashboardStore.getState().toggleContainer(id),
       },
     }));
 
-    const flowEdges: Edge[] = filteredGraphEdges.map((edge, i) => {
-      const sourceInDiff = diffMode && diffNodeIds.has(edge.source);
-      const targetInDiff = diffMode && diffNodeIds.has(edge.target);
-      const isImpacted = diffMode && (sourceInDiff || targetInDiff);
+    // Build ungrouped file flow nodes (existing CustomFlowNode shape)
+    const ungroupedFlowNodes: CustomFlowNode[] = filteredGraphNodes
+      .filter((n) => ungroupedSet.has(n.id))
+      .map((node) => ({
+        id: node.id,
+        type: "custom" as const,
+        position: { x: 0, y: 0 },
+        data: {
+          label: node.name ?? node.filePath?.split("/").pop() ?? node.id,
+          nodeType: node.type,
+          summary: node.summary,
+          complexity: node.complexity,
+          isHighlighted: false,
+          searchScore: undefined,
+          isSelected: false,
+          isTourHighlighted: false,
+          isDiffChanged: diffMode && changedNodeIds.has(node.id),
+          isDiffAffected: diffMode && affectedNodeIds.has(node.id),
+          isDiffFaded: diffMode && !changedNodeIds.has(node.id) && !affectedNodeIds.has(node.id),
+          isNeighbor: false,
+          isSelectionFaded: false,
+          onNodeClick: handleNodeSelect,
+        },
+      }));
 
-      let edgeStyle: React.CSSProperties;
-      let edgeLabelStyle: React.CSSProperties;
-      let edgeAnimated: boolean;
-
-      if (isImpacted) {
-        edgeStyle = {
-          stroke: sourceInDiff && targetInDiff ? "rgba(224, 82, 82, 0.7)" : "rgba(212, 160, 48, 0.5)",
-          strokeWidth: 2.5,
-        };
-        edgeLabelStyle = { fill: "#a39787", fontSize: 10 };
-        edgeAnimated = true;
-      } else if (diffMode) {
-        edgeStyle = { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 };
-        edgeLabelStyle = { fill: "rgba(163,151,135,0.3)", fontSize: 10 };
-        edgeAnimated = false;
-      } else {
-        edgeStyle = { stroke: "rgba(212,165,116,0.3)", strokeWidth: 1.5 };
-        edgeLabelStyle = { fill: "#a39787", fontSize: 10 };
-        edgeAnimated = edge.type === "calls";
-      }
-
+    // Aggregated cross-atom edges (count label, log-scaled stroke).
+    // diffMode dims unaffected aggregated edges (no per-edge diff data — we
+    // can't tell which underlying edges are impacted without expanding a
+    // container, so just fade everything in diff mode at this stage).
+    const aggEdges: Edge[] = interContainerAggregated.map((agg, i) => {
+      const baseStyle = diffMode
+        ? { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }
+        : {
+            stroke: "rgba(212,165,116,0.4)",
+            strokeWidth: Math.min(1 + Math.log2(agg.count + 1), 5),
+          };
       return {
-        id: `e-${i}`,
-        source: edge.source,
-        target: edge.target,
-        label: edge.type,
-        animated: edgeAnimated,
-        style: edgeStyle,
-        labelStyle: edgeLabelStyle,
+        id: `agg-${i}`,
+        source: agg.sourceContainerId,
+        target: agg.targetContainerId,
+        label: String(agg.count),
+        style: baseStyle,
+        labelStyle: {
+          fill: diffMode ? "rgba(163,151,135,0.3)" : "#a39787",
+          fontSize: 11,
+        },
       };
     });
 
-    // Portal nodes for connected external layers
+    // Portal nodes for connected external layers (unchanged)
     const portals = computePortals(graph, activeLayerId);
     const layerIndexMap = new Map(graph.layers.map((l, i) => [l.id, i]));
 
@@ -427,39 +493,149 @@ function useLayerDetailTopology() {
     }));
 
     const portalEdges: Edge[] = [];
-    let portalEdgeIdx = flowEdges.length;
+    let portalEdgeIdx = aggEdges.length;
     for (const portal of portals) {
       const crossFiles = findCrossLayerFileNodes(graph, activeLayerId, portal.layerId);
+      // Dedupe by atom — multiple files in the same container hitting the
+      // same portal collapse to one Stage 1 edge. Task 12 will re-route to
+      // the actual file ids when the source container expands.
+      const seenAtoms = new Set<string>();
       for (const fileId of crossFiles) {
-        if (filteredNodeIds.has(fileId)) {
-          portalEdges.push({
-            id: `e-${portalEdgeIdx++}`,
-            source: fileId,
-            target: `portal:${portal.layerId}`,
-            style: { stroke: "rgba(212,165,116,0.2)", strokeWidth: 1, strokeDasharray: "4 4" },
-            animated: false,
-          });
-        }
+        if (!filteredNodeIds.has(fileId)) continue;
+        const atomId = nodeToContainer.get(fileId) ?? fileId;
+        if (seenAtoms.has(atomId)) continue;
+        seenAtoms.add(atomId);
+        portalEdges.push({
+          id: `e-${portalEdgeIdx++}`,
+          source: atomId,
+          target: `portal:${portal.layerId}`,
+          style: { stroke: "rgba(212,165,116,0.2)", strokeWidth: 1, strokeDasharray: "4 4" },
+          animated: false,
+        });
       }
     }
 
-    const allFlowNodes: Node[] = [
-      ...(flowNodes as unknown as Node[]),
-      ...(portalNodes as unknown as Node[]),
+    return {
+      containers,
+      ungrouped,
+      nodeToContainer,
+      intraContainer,
+      filteredGraphEdges,
+      containerFlowNodes,
+      ungroupedFlowNodes,
+      aggEdges,
+      portalNodes,
+      portalEdges,
+    };
+  }, [
+    graph,
+    activeLayerId,
+    persona,
+    diffMode,
+    changedNodeIds,
+    affectedNodeIds,
+    focusNodeId,
+    nodeTypeFilters,
+    drillIntoLayer,
+    handleNodeSelect,
+  ]);
+
+  // ── Async ELK Stage 1 layout ────────────────────────────────────────────
+  const [topology, setTopology] = useState<LayerDetailTopology>(EMPTY_TOPOLOGY);
+
+  useEffect(() => {
+    if (!built) {
+      setTopology(EMPTY_TOPOLOGY);
+      return;
+    }
+    let cancelled = false;
+    const {
+      containers,
+      nodeToContainer,
+      intraContainer,
+      filteredGraphEdges,
+      containerFlowNodes,
+      ungroupedFlowNodes,
+      aggEdges,
+      portalNodes,
+      portalEdges,
+    } = built;
+
+    // Build Stage 1 ELK input: containers as opaque atoms + ungrouped files
+    // + portals, all at the top level.
+    const stage1Children: ElkChild[] = [
+      ...containerFlowNodes.map((cn) => ({
+        id: cn.id,
+        width: cn.width ?? NODE_WIDTH,
+        height: cn.height ?? NODE_HEIGHT,
+      })),
+      ...ungroupedFlowNodes.map((un) => ({
+        id: un.id,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      })),
+      ...portalNodes.map((pn) => ({
+        id: pn.id,
+        width: PORTAL_NODE_WIDTH,
+        height: PORTAL_NODE_HEIGHT,
+      })),
     ];
-    const allFlowEdges = [...flowEdges, ...portalEdges];
 
-    const dims = new Map<string, { width: number; height: number }>();
-    for (const n of flowNodes) {
-      dims.set(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-    }
-    for (const n of portalNodes) {
-      dims.set(n.id, { width: PORTAL_NODE_WIDTH, height: PORTAL_NODE_HEIGHT });
-    }
+    const stage1Edges: ElkEdge[] = [
+      ...aggEdges.map((e) => ({
+        id: e.id,
+        sources: [String(e.source)],
+        targets: [String(e.target)],
+      })),
+      ...portalEdges.map((e) => ({
+        id: e.id,
+        sources: [String(e.source)],
+        targets: [String(e.target)],
+      })),
+    ];
 
-    const laid = applyDagreLayout(allFlowNodes, allFlowEdges, "TB", dims);
-    return { nodes: laid.nodes, edges: laid.edges, portalNodes, portalEdges, filteredEdges: filteredGraphEdges };
-  }, [graph, activeLayerId, persona, handleNodeSelect, diffMode, changedNodeIds, affectedNodeIds, focusNodeId, nodeTypeFilters, drillIntoLayer]);
+    const elkInput: ElkInput = {
+      id: "layer",
+      layoutOptions: ELK_DEFAULT_LAYOUT_OPTIONS,
+      children: stage1Children,
+      edges: stage1Edges,
+    };
+
+    applyElkLayout(elkInput, { strict: import.meta.env.DEV })
+      .then(({ positioned, issues }) => {
+        if (cancelled) return;
+        if (issues.length > 0) {
+          // TODO: Task 16 wires these into the WarningBanner.
+          console.warn("[layer-detail Stage 1 ELK] layout issues:", issues);
+        }
+        const allBaseNodes: Node[] = [
+          ...(containerFlowNodes as unknown as Node[]),
+          ...(ungroupedFlowNodes as unknown as Node[]),
+          ...(portalNodes as unknown as Node[]),
+        ];
+        const positionedNodes = mergeElkPositions(allBaseNodes, positioned);
+        setTopology({
+          nodes: positionedNodes,
+          edges: aggEdges,
+          portalNodes,
+          portalEdges,
+          filteredEdges: filteredGraphEdges,
+          containers,
+          nodeToContainer,
+          intraContainer,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[layer-detail Stage 1 ELK] layout failed:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [built]);
+
+  return topology;
 }
 
 /**
@@ -488,8 +664,9 @@ function useLayerDetailGraph() {
     }
 
     return topo.nodes.map((node) => {
-      // Skip portal nodes — they have no CustomNodeData
-      if (node.type === "portal") return node;
+      // Skip portal + container nodes — they have no CustomNodeData.
+      // (Container visual overlays land in Task 14.)
+      if (node.type === "portal" || node.type === "container") return node;
 
       const searchScore = searchMap.get(node.id);
       const isHighlighted = searchScore !== undefined;
