@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -176,6 +177,11 @@ function readSourceFile(url: URL) {
 }
 
 export default defineConfig({
+  test: {
+    environment: "node",
+    include: ["src/**/__tests__/**/*.test.ts"],
+  },
+
   // FIX 1 — bind only to localhost, not 0.0.0.0
   // This blocks access from any other device on the same LAN / WiFi.
   server: {
