@@ -78,32 +78,83 @@ const NODE_TYPE_TO_CATEGORY: Record<NodeType, NodeCategory> = {
 
 // ── Helper components that must live inside <ReactFlow> ────────────────
 
-/** Pans/zooms to tour-highlighted nodes. */
+/**
+ * Pans/zooms to tour-highlighted nodes. Highlighted nodes are usually
+ * children of collapsed containers — auto-expand fires synchronously on
+ * the same `tourHighlightedNodeIds` change, but their child entries don't
+ * appear in React Flow's node list until Stage 2 layout writes the
+ * `containerLayoutCache` (async ELK call, hundreds of ms on big layers).
+ *
+ * We subscribe to React Flow's reactive node list via `useNodes()` so the
+ * effect re-runs every time the node set actually changes (Stage 1, Stage
+ * 2, expand/collapse). When every highlighted id is present we fit; until
+ * then we wait. A 2s fallback timer covers the case where a highlighted
+ * id is filtered out and never materialises.
+ */
 function TourFitView() {
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
-  const { fitView } = useReactFlow();
-  const prevRef = useRef<string[]>([]);
+  const setTourFitPending = useDashboardStore((s) => s.setTourFitPending);
+  const { fitView, getInternalNode } = useReactFlow();
+  const fittedKeyRef = useRef<string>("");
 
   useEffect(() => {
-    const prev = prevRef.current;
-    const changed =
-      tourHighlightedNodeIds.length > 0 &&
-      (tourHighlightedNodeIds.length !== prev.length ||
-        tourHighlightedNodeIds.some((id, i) => id !== prev[i]));
-    prevRef.current = tourHighlightedNodeIds;
+    const targetKey = tourHighlightedNodeIds.join("\n");
+    if (targetKey === "") {
+      fittedKeyRef.current = "";
+      setTourFitPending(false);
+      return;
+    }
+    if (targetKey === fittedKeyRef.current) return;
 
-    if (changed) {
-      requestAnimationFrame(() => {
+    // Wait for React Flow to finish Stage 2 layout AND post-mount measure
+    // before fitting. We poll the internal lookup directly because
+    // `useNodes()` reflects user-supplied nodes only and doesn't fire on
+    // measure completion. Once every highlighted id has measured
+    // dimensions, hand the ids to fitView — React Flow handles the
+    // child→absolute coordinate transform itself, which is more reliable
+    // than recomputing bbox manually.
+    const MAX_FRAMES = 240; // ~4s at 60fps
+    let frame = 0;
+    let cancelled = false;
+    let rafId = 0;
+    setTourFitPending(true);
+
+    const tick = () => {
+      if (cancelled) return;
+      let ready = true;
+      for (const id of tourHighlightedNodeIds) {
+        const internal = getInternalNode(id);
+        if (!internal || !internal.measured?.width || !internal.measured?.height) {
+          ready = false;
+          break;
+        }
+      }
+      if (ready) {
         fitView({
           nodes: tourHighlightedNodeIds.map((id) => ({ id })),
           duration: 500,
           padding: 0.3,
           maxZoom: 1.2,
-          minZoom: 0.01,
+          minZoom: 0.4,
         });
-      });
-    }
-  }, [tourHighlightedNodeIds, fitView]);
+        fittedKeyRef.current = targetKey;
+        setTourFitPending(false);
+        return;
+      }
+      if (++frame < MAX_FRAMES) {
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+      fitView({ duration: 500, padding: 0.3 });
+      fittedKeyRef.current = targetKey;
+      setTourFitPending(false);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+    };
+  }, [tourHighlightedNodeIds, fitView, getInternalNode, setTourFitPending]);
 
   return null;
 }
@@ -1219,6 +1270,10 @@ function GraphViewInner() {
   const setReactFlowInstance = useDashboardStore((s) => s.setReactFlowInstance);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
   const expandContainer = useDashboardStore((s) => s.expandContainer);
+  const collapseContainer = useDashboardStore((s) => s.collapseContainer);
+  const pendingFocusContainer = useDashboardStore((s) => s.pendingFocusContainer);
+  const setPendingFocusContainer = useDashboardStore((s) => s.setPendingFocusContainer);
+  const tourFitPending = useDashboardStore((s) => s.tourFitPending);
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
@@ -1237,7 +1292,7 @@ function GraphViewInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  const { fitView, getViewport } = useReactFlow();
+  const { fitView, getViewport, setCenter } = useReactFlow();
 
   useEffect(() => {
     setNodes(initialNodes);
@@ -1267,6 +1322,33 @@ function GraphViewInner() {
     return () => cancelAnimationFrame(raf);
   }, [nodes, fitView]);
 
+  // Lock viewport onto a container the user just manually expanded so it
+  // appears to expand in place rather than getting yanked off-screen by
+  // the surrounding ELK reflow. Re-runs as nodes update (Stage 2 may
+  // shift positions a few times) and clears itself after a short window
+  // so subsequent layout shifts stop hijacking the viewport.
+  useEffect(() => {
+    if (!pendingFocusContainer) return;
+    const node = nodes.find((n) => n.id === pendingFocusContainer);
+    if (!node) return;
+    const w =
+      (node.width as number | undefined) ??
+      ((node.style?.width as number | undefined) ?? 0);
+    const h =
+      (node.height as number | undefined) ??
+      ((node.style?.height as number | undefined) ?? 0);
+    const cx = node.position.x + w / 2;
+    const cy = node.position.y + h / 2;
+    const { zoom } = getViewport();
+    setCenter(cx, cy, { zoom, duration: 0 });
+  }, [pendingFocusContainer, nodes, getViewport, setCenter]);
+
+  useEffect(() => {
+    if (!pendingFocusContainer) return;
+    const t = window.setTimeout(() => setPendingFocusContainer(null), 1200);
+    return () => window.clearTimeout(t);
+  }, [pendingFocusContainer, setPendingFocusContainer]);
+
   // ── Auto-expand triggers (Task 13) ─────────────────────────────────────
   // Only meaningful in layer-detail; in overview mode there are no
   // containers so all three effects no-op.
@@ -1281,15 +1363,40 @@ function GraphViewInner() {
     if (cid && cid !== focusNodeId) expandContainer(cid);
   }, [focusNodeId, nodeToContainer, expandContainer]);
 
-  // Tour: expand containers for every tour-highlighted node so the tour
-  // can fitView onto real nodes rather than collapsed atoms.
+  // Tour: expand containers needed for the current step, and release any
+  // containers we expanded for the previous step that aren't needed now.
+  // Containers the user expanded manually aren't tracked here, so they're
+  // never auto-collapsed. stopTour resets tourHighlightedNodeIds to [],
+  // which falls through to the "release all" branch.
+  const tourBorrowedContainersRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (tourHighlightedNodeIds.length === 0 || !nodeToContainer) return;
+    if (!nodeToContainer) return;
+
+    const needed = new Set<string>();
     for (const nid of tourHighlightedNodeIds) {
       const cid = nodeToContainer.get(nid);
-      if (cid && cid !== nid) expandContainer(cid);
+      if (cid && cid !== nid) needed.add(cid);
     }
-  }, [tourHighlightedNodeIds, nodeToContainer, expandContainer]);
+
+    const stillBorrowed = new Set<string>();
+    for (const cid of tourBorrowedContainersRef.current) {
+      if (needed.has(cid)) {
+        stillBorrowed.add(cid);
+      } else {
+        collapseContainer(cid);
+      }
+    }
+
+    const expandedNow = useDashboardStore.getState().expandedContainers;
+    for (const cid of needed) {
+      if (!expandedNow.has(cid)) {
+        expandContainer(cid);
+        stillBorrowed.add(cid);
+      }
+    }
+
+    tourBorrowedContainersRef.current = stillBorrowed;
+  }, [tourHighlightedNodeIds, nodeToContainer, expandContainer, collapseContainer]);
 
   // Zoom: debounced auto-expand when the user has zoomed in past 1.0.
   // Hysteresis: zoom < 0.6 = no auto-expand AND no auto-collapse (v1, the
@@ -1406,7 +1513,7 @@ function GraphViewInner() {
         <TourFitView />
         <SelectedNodeFitView />
       </ReactFlow>
-      {layoutStatus === "computing" && (
+      {(layoutStatus === "computing" || tourFitPending) && (
         <div
           style={{
             position: "absolute",
@@ -1419,7 +1526,9 @@ function GraphViewInner() {
             zIndex: 10,
           }}
         >
-          <span style={{ color: "#d4a574", fontSize: 14 }}>Computing layout…</span>
+          <span style={{ color: "#d4a574", fontSize: 14 }}>
+            {tourFitPending ? "Locating tour highlight…" : "Computing layout…"}
+          </span>
         </div>
       )}
     </div>

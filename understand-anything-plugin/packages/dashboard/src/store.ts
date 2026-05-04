@@ -196,7 +196,14 @@ interface DashboardStore {
   expandedContainers: Set<string>;
   toggleContainer: (containerId: string) => void;
   expandContainer: (containerId: string) => void;
+  collapseContainer: (containerId: string) => void;
   collapseAllContainers: () => void;
+  /** Container the user just manually expanded; viewport should lock onto it. Cleared by GraphView once the lock is applied. */
+  pendingFocusContainer: string | null;
+  setPendingFocusContainer: (containerId: string | null) => void;
+  /** True while TourFitView is waiting for highlighted nodes to materialise (Stage 2 layout in progress). Drives the "Computing layout…" overlay. */
+  tourFitPending: boolean;
+  setTourFitPending: (pending: boolean) => void;
 
   containerLayoutCache: Map<
     string,
@@ -243,6 +250,28 @@ function navigateTourToLayer(
     };
   }
   return {};
+}
+
+/**
+ * Container ids derive from per-layer state — folder names in folder-strategy
+ * layers, community indices (`container:cluster-N`) in community-strategy
+ * layers — and collide across layers (e.g. API Contracts and Load Testing
+ * both produce `container:cluster-0`). When a tour step crosses layers we
+ * must drop the previous layer's container caches so Stage 2 actually re-
+ * runs for the new layer's children. Mirrors the reset block in
+ * `drillIntoLayer`.
+ */
+function layerResetIfChanged(
+  layerNav: Partial<DashboardStore>,
+  prevLayerId: string | null,
+): Partial<DashboardStore> {
+  const next = layerNav.activeLayerId;
+  if (!next || next === prevLayerId) return {};
+  return {
+    containerLayoutCache: new Map(),
+    containerSizeMemory: new Map(),
+    expandedContainers: new Set(),
+  };
 }
 
 export const useDashboardStore = create<DashboardStore>()((set, get) => ({
@@ -532,7 +561,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   startTour: () => {
-    const { graph, nodeIdToLayerId } = get();
+    const { graph, nodeIdToLayerId, activeLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
     const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[0].nodeIds);
@@ -542,6 +571,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       tourHighlightedNodeIds: sorted[0].nodeIds,
       selectedNodeId: null,
       ...layerNav,
+      ...layerResetIfChanged(layerNav, activeLayerId),
     });
   },
 
@@ -553,7 +583,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }),
 
   setTourStep: (step) => {
-    const { graph, nodeIdToLayerId } = get();
+    const { graph, nodeIdToLayerId, activeLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
     if (step < 0 || step >= sorted.length) return;
@@ -562,11 +592,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       currentTourStep: step,
       tourHighlightedNodeIds: sorted[step].nodeIds,
       ...layerNav,
+      ...layerResetIfChanged(layerNav, activeLayerId),
     });
   },
 
   nextTourStep: () => {
-    const { graph, currentTourStep, nodeIdToLayerId } = get();
+    const { graph, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
     if (currentTourStep < sorted.length - 1) {
@@ -576,12 +607,13 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
         currentTourStep: next,
         tourHighlightedNodeIds: sorted[next].nodeIds,
         ...layerNav,
+        ...layerResetIfChanged(layerNav, activeLayerId),
       });
     }
   },
 
   prevTourStep: () => {
-    const { graph, currentTourStep, nodeIdToLayerId } = get();
+    const { graph, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     if (currentTourStep > 0) {
       const sorted = getSortedTour(graph);
@@ -591,6 +623,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
         currentTourStep: prev,
         tourHighlightedNodeIds: sorted[prev].nodeIds,
         ...layerNav,
+        ...layerResetIfChanged(layerNav, activeLayerId),
       });
     }
   },
@@ -641,18 +674,36 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   expandedContainers: new Set<string>(),
+  pendingFocusContainer: null,
+  setPendingFocusContainer: (containerId) =>
+    set({ pendingFocusContainer: containerId }),
+  tourFitPending: false,
+  setTourFitPending: (pending) => set({ tourFitPending: pending }),
   toggleContainer: (containerId) =>
     set((state) => {
       const next = new Set(state.expandedContainers);
-      if (next.has(containerId)) next.delete(containerId);
-      else next.add(containerId);
-      return { expandedContainers: next };
+      const willExpand = !next.has(containerId);
+      if (willExpand) next.add(containerId);
+      else next.delete(containerId);
+      return {
+        expandedContainers: next,
+        pendingFocusContainer: willExpand
+          ? containerId
+          : state.pendingFocusContainer,
+      };
     }),
   expandContainer: (containerId) =>
     set((state) => {
       if (state.expandedContainers.has(containerId)) return {};
       const next = new Set(state.expandedContainers);
       next.add(containerId);
+      return { expandedContainers: next };
+    }),
+  collapseContainer: (containerId) =>
+    set((state) => {
+      if (!state.expandedContainers.has(containerId)) return {};
+      const next = new Set(state.expandedContainers);
+      next.delete(containerId);
       return { expandedContainers: next };
     }),
   collapseAllContainers: () => set({ expandedContainers: new Set() }),
@@ -689,3 +740,4 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }),
   clearLayoutIssues: () => set({ layoutIssues: [] }),
 }));
+
