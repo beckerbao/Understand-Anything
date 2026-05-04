@@ -51,6 +51,7 @@ import {
 } from "../utils/edgeAggregation";
 import { deriveContainers } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
+import { computeLayerStats } from "../utils/layerStats";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -139,6 +140,8 @@ function SelectedNodeFitView() {
 
 function useOverviewGraph() {
   const graph = useDashboardStore((s) => s.graph);
+  const nodesById = useDashboardStore((s) => s.nodesById);
+  const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
 
@@ -154,36 +157,25 @@ function useOverviewGraph() {
       return null;
     }
 
-    // Build search match counts per layer
+    // Build search match counts per layer using the precomputed
+    // nodeIdToLayerId index. Reusing the store-level index avoids an extra
+    // O(N) pass when search results change frequently.
     const searchMatchByLayer = new Map<string, number>();
     if (searchResults.length > 0) {
-      const nodeToLayer = new Map<string, string>();
-      for (const layer of layers) {
-        for (const nid of layer.nodeIds) {
-          nodeToLayer.set(nid, layer.id);
-        }
-      }
       for (const result of searchResults) {
-        const lid = nodeToLayer.get(result.nodeId);
+        const lid = nodeIdToLayerId.get(result.nodeId);
         if (lid) {
           searchMatchByLayer.set(lid, (searchMatchByLayer.get(lid) ?? 0) + 1);
         }
       }
     }
 
-    // Create cluster nodes
+    // Create cluster nodes. Per-layer aggregation goes through
+    // `computeLayerStats`, which iterates `layer.nodeIds` against the
+    // `nodesById` index — O(K) per layer instead of the previous
+    // O(N) Array.filter that ran `layer.nodeIds.includes(n.id)` (#102).
     const clusterNodes: LayerClusterFlowNode[] = layers.map((layer, i) => {
-      const memberNodes = graph.nodes.filter((n) => layer.nodeIds.includes(n.id));
-      const complexCounts = { simple: 0, moderate: 0, complex: 0 };
-      for (const n of memberNodes) {
-        complexCounts[n.complexity]++;
-      }
-      const aggregateComplexity =
-        complexCounts.complex > memberNodes.length * 0.3
-          ? "complex"
-          : complexCounts.moderate > memberNodes.length * 0.3
-            ? "moderate"
-            : "simple";
+      const { aggregateComplexity } = computeLayerStats(layer, nodesById);
 
       return {
         id: layer.id,
@@ -222,7 +214,7 @@ function useOverviewGraph() {
     }
 
     return { clusterNodes, flowEdges, dims };
-  }, [graph, searchResults, drillIntoLayer]);
+  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer]);
 
   const [overview, setOverview] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],

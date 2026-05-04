@@ -3,6 +3,7 @@ import { SearchEngine } from "@understand-anything/core/search";
 import type { SearchResult } from "@understand-anything/core/search";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import type {
+  GraphNode,
   KnowledgeGraph,
   TourStep,
 } from "@understand-anything/core/types";
@@ -49,12 +50,47 @@ const DEFAULT_FILTERS: FilterState = {
 /** Categories used for node type filter toggles. Single source of truth for NodeCategory. */
 export type NodeCategory = "code" | "config" | "docs" | "infra" | "data" | "domain" | "knowledge";
 
-/** Find which layer a node belongs to. Returns layerId or null. */
-function findNodeLayer(graph: KnowledgeGraph, nodeId: string): string | null {
+/**
+ * Build the (id → node) and (id → layerId) lookup maps that the rest of
+ * the dashboard reads via store selectors. Centralised so `setGraph` and
+ * any future graph-replacement path stay in sync.
+ *
+ * Two layer indexes, intentionally distinct:
+ *
+ * - `nodeIdToLayerId` preserves the prior `findNodeLayer` "first matching
+ *   layer wins" semantics — if a node id appears in multiple layers
+ *   (rare but legal in the schema), the first occurrence in `graph.layers`
+ *   order is the one we map to. Drives navigation (drillIntoLayer, tour
+ *   step → layer, sidebar history) where a single canonical layer is the
+ *   right answer.
+ *
+ * - `nodeIdToLayerIds` records *every* layer a node belongs to. Drives
+ *   membership queries (filterNodes) where the prior `Layer[] +
+ *   layer.nodeIds.includes` shape was any-layer-wins — a node in L1 and
+ *   L2 with only L2 selected must still pass. Collapsing to first-wins
+ *   for filtering would be a silent regression.
+ */
+function buildGraphIndexes(graph: KnowledgeGraph): {
+  nodesById: Map<string, GraphNode>;
+  nodeIdToLayerId: Map<string, string>;
+  nodeIdToLayerIds: Map<string, Set<string>>;
+} {
+  const nodesById = new Map<string, GraphNode>();
+  for (const node of graph.nodes) nodesById.set(node.id, node);
+  const nodeIdToLayerId = new Map<string, string>();
+  const nodeIdToLayerIds = new Map<string, Set<string>>();
   for (const layer of graph.layers) {
-    if (layer.nodeIds.includes(nodeId)) return layer.id;
+    for (const nid of layer.nodeIds) {
+      if (!nodeIdToLayerId.has(nid)) nodeIdToLayerId.set(nid, layer.id);
+      let set = nodeIdToLayerIds.get(nid);
+      if (!set) {
+        set = new Set<string>();
+        nodeIdToLayerIds.set(nid, set);
+      }
+      set.add(layer.id);
+    }
   }
-  return null;
+  return { nodesById, nodeIdToLayerId, nodeIdToLayerIds };
 }
 
 /** Maximum number of entries in the sidebar navigation history. */
@@ -62,6 +98,12 @@ const MAX_HISTORY = 50;
 
 interface DashboardStore {
   graph: KnowledgeGraph | null;
+  /** id → node lookup, rebuilt by setGraph. Empty before any graph loads. */
+  nodesById: Map<string, GraphNode>;
+  /** id → layer id (first-matching-layer wins), rebuilt by setGraph. Empty before any graph loads. */
+  nodeIdToLayerId: Map<string, string>;
+  /** id → set of every layer the node belongs to, rebuilt by setGraph. Empty before any graph loads. */
+  nodeIdToLayerIds: Map<string, Set<string>>;
   selectedNodeId: string | null;
   searchQuery: string;
   searchResults: SearchResult[];
@@ -189,11 +231,11 @@ function getSortedTour(graph: KnowledgeGraph): TourStep[] {
 
 /** Navigate tour step to the correct layer for the first highlighted node. */
 function navigateTourToLayer(
-  graph: KnowledgeGraph,
+  nodeIdToLayerId: Map<string, string>,
   nodeIds: string[],
 ): Partial<DashboardStore> {
   if (nodeIds.length === 0) return {};
-  const layerId = findNodeLayer(graph, nodeIds[0]);
+  const layerId = nodeIdToLayerId.get(nodeIds[0]);
   if (layerId) {
     return {
       navigationLevel: "layer-detail" as const,
@@ -205,6 +247,9 @@ function navigateTourToLayer(
 
 export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   graph: null,
+  nodesById: new Map<string, GraphNode>(),
+  nodeIdToLayerId: new Map<string, string>(),
+  nodeIdToLayerIds: new Map<string, Set<string>>(),
   selectedNodeId: null,
   searchQuery: "",
   searchResults: [],
@@ -259,8 +304,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     const { viewMode, domainGraph, activeDomainId } = get();
     // Preserve domain view if a domain graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
+    const { nodesById, nodeIdToLayerId, nodeIdToLayerIds } = buildGraphIndexes(graph);
     set({
       graph,
+      nodesById,
+      nodeIdToLayerId,
+      nodeIdToLayerIds,
       searchEngine,
       searchResults,
       navigationLevel: "overview",
@@ -296,9 +345,9 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   navigateToNodeInLayer: (nodeId) => {
-    const { graph, selectedNodeId, nodeHistory } = get();
+    const { graph, selectedNodeId, nodeHistory, nodeIdToLayerId } = get();
     if (!graph) return;
-    const layerId = findNodeLayer(graph, nodeId);
+    const layerId = nodeIdToLayerId.get(nodeId) ?? null;
     const newHistory =
       selectedNodeId && nodeId !== selectedNodeId
         ? [...nodeHistory, selectedNodeId].slice(-MAX_HISTORY)
@@ -323,11 +372,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   navigateToHistoryIndex: (index) => {
-    const { nodeHistory, graph } = get();
+    const { nodeHistory, graph, nodeIdToLayerId } = get();
     if (!graph || index < 0 || index >= nodeHistory.length) return;
     const targetId = nodeHistory[index];
     const newHistory = nodeHistory.slice(0, index);
-    const layerId = findNodeLayer(graph, targetId);
+    const layerId = nodeIdToLayerId.get(targetId) ?? null;
     set({
       selectedNodeId: targetId,
       nodeHistory: newHistory,
@@ -336,11 +385,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   goBackNode: () => {
-    const { nodeHistory, graph } = get();
+    const { nodeHistory, graph, nodeIdToLayerId } = get();
     if (nodeHistory.length === 0 || !graph) return;
     const prevNodeId = nodeHistory[nodeHistory.length - 1];
     const newHistory = nodeHistory.slice(0, -1);
-    const layerId = findNodeLayer(graph, prevNodeId);
+    const layerId = nodeIdToLayerId.get(prevNodeId) ?? null;
     if (layerId) {
       set({
         navigationLevel: "layer-detail",
@@ -483,10 +532,10 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   startTour: () => {
-    const { graph } = get();
+    const { graph, nodeIdToLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
-    const layerNav = navigateTourToLayer(graph, sorted[0].nodeIds);
+    const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[0].nodeIds);
     set({
       tourActive: true,
       currentTourStep: 0,
@@ -504,11 +553,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }),
 
   setTourStep: (step) => {
-    const { graph } = get();
+    const { graph, nodeIdToLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
     if (step < 0 || step >= sorted.length) return;
-    const layerNav = navigateTourToLayer(graph, sorted[step].nodeIds);
+    const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[step].nodeIds);
     set({
       currentTourStep: step,
       tourHighlightedNodeIds: sorted[step].nodeIds,
@@ -517,12 +566,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   nextTourStep: () => {
-    const { graph, currentTourStep } = get();
+    const { graph, currentTourStep, nodeIdToLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     const sorted = getSortedTour(graph);
     if (currentTourStep < sorted.length - 1) {
       const next = currentTourStep + 1;
-      const layerNav = navigateTourToLayer(graph, sorted[next].nodeIds);
+      const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[next].nodeIds);
       set({
         currentTourStep: next,
         tourHighlightedNodeIds: sorted[next].nodeIds,
@@ -532,12 +581,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   prevTourStep: () => {
-    const { graph, currentTourStep } = get();
+    const { graph, currentTourStep, nodeIdToLayerId } = get();
     if (!graph || !graph.tour || graph.tour.length === 0) return;
     if (currentTourStep > 0) {
       const sorted = getSortedTour(graph);
       const prev = currentTourStep - 1;
-      const layerNav = navigateTourToLayer(graph, sorted[prev].nodeIds);
+      const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[prev].nodeIds);
       set({
         currentTourStep: prev,
         tourHighlightedNodeIds: sorted[prev].nodeIds,

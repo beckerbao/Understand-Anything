@@ -1,15 +1,27 @@
-import type { GraphNode, GraphEdge, Layer } from "@understand-anything/core/types";
+import type { GraphNode, GraphEdge } from "@understand-anything/core/types";
 import type { FilterState, NodeType, Complexity, EdgeCategory } from "../store";
 import { EDGE_CATEGORY_MAP } from "../store";
 
 /**
- * Filter nodes based on active filters
+ * Filter nodes based on active filters.
+ *
+ * Pass `nodeIdToLayerIds` from the store (precomputed once on `setGraph`)
+ * so the layer-membership check is O(1) per node. The previous shape took
+ * `Layer[]` and ran `layer.nodeIds.includes(node.id)` per node-per-layer,
+ * which was O(N × L × K) and dominated export time on large graphs (#102).
+ *
+ * Membership semantics are any-layer-wins, matching the prior shape: a
+ * node in L1 and L2 with only L2 selected passes. The store's other
+ * index, `nodeIdToLayerId`, is first-wins and is for navigation, not
+ * filtering — using it here would silently drop multi-layer nodes whose
+ * first declared layer isn't selected.
  */
 export function filterNodes(
   nodes: GraphNode[],
-  layers: Layer[],
+  nodeIdToLayerIds: Map<string, Set<string>>,
   filters: FilterState,
 ): GraphNode[] {
+  const hasLayerFilter = filters.layerIds.size > 0;
   return nodes.filter((node) => {
     // Filter by node type
     if (!filters.nodeTypes.has(node.type as NodeType)) {
@@ -22,13 +34,17 @@ export function filterNodes(
     }
 
     // Filter by layer (if any layers are selected)
-    if (filters.layerIds.size > 0) {
-      const nodeInSelectedLayer = layers.some(
-        (layer) => filters.layerIds.has(layer.id) && layer.nodeIds.includes(node.id)
-      );
-      if (!nodeInSelectedLayer) {
-        return false;
+    if (hasLayerFilter) {
+      const layerIds = nodeIdToLayerIds.get(node.id);
+      if (!layerIds) return false;
+      let inSelected = false;
+      for (const lid of layerIds) {
+        if (filters.layerIds.has(lid)) {
+          inSelected = true;
+          break;
+        }
       }
+      if (!inSelected) return false;
     }
 
     return true;
