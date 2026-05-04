@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
+  useNodes,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -95,24 +96,29 @@ function TourFitView() {
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
   const setTourFitPending = useDashboardStore((s) => s.setTourFitPending);
   const { fitView, getInternalNode } = useReactFlow();
+  // Subscribe to React Flow's user-node array so this effect re-fires when
+  // the node set changes (e.g. Stage 2 finally lands the highlighted ids
+  // after the per-step RAF window already gave up). The RAF poll inside
+  // covers the common fast path; the `nodes` dep covers slow Stage 2.
+  const nodes = useNodes();
   const fittedKeyRef = useRef<string>("");
+  const fallbackKeyRef = useRef<string>("");
 
   useEffect(() => {
     const targetKey = tourHighlightedNodeIds.join("\n");
     if (targetKey === "") {
       fittedKeyRef.current = "";
+      fallbackKeyRef.current = "";
       setTourFitPending(false);
       return;
     }
     if (targetKey === fittedKeyRef.current) return;
 
-    // Wait for React Flow to finish Stage 2 layout AND post-mount measure
-    // before fitting. We poll the internal lookup directly because
-    // `useNodes()` reflects user-supplied nodes only and doesn't fire on
-    // measure completion. Once every highlighted id has measured
-    // dimensions, hand the ids to fitView — React Flow handles the
-    // child→absolute coordinate transform itself, which is more reliable
-    // than recomputing bbox manually.
+    // Poll React Flow's internal lookup directly — `useNodes()` reflects
+    // user-supplied nodes and may not fire on measure completion. Once
+    // every highlighted id has measured dimensions, `fitView({ nodes })`
+    // handles the child→absolute coordinate transform itself, which is
+    // more reliable than recomputing bbox manually.
     const MAX_FRAMES = 240; // ~4s at 60fps
     let frame = 0;
     let cancelled = false;
@@ -138,6 +144,7 @@ function TourFitView() {
           minZoom: 0.4,
         });
         fittedKeyRef.current = targetKey;
+        fallbackKeyRef.current = "";
         setTourFitPending(false);
         return;
       }
@@ -145,8 +152,16 @@ function TourFitView() {
         rafId = requestAnimationFrame(tick);
         return;
       }
-      fitView({ duration: 500, padding: 0.3 });
-      fittedKeyRef.current = targetKey;
+      // Highlights still not ready after the poll window. Pan into the
+      // layer so the user isn't stranded, but DON'T set fittedKeyRef —
+      // if Stage 2 lands later, a `nodes` change will re-fire this effect
+      // and we'll get another shot at the proper highlight fit.
+      // `fallbackKeyRef` prevents the fallback fitView from re-firing on
+      // every subsequent nodes update for the same step.
+      if (fallbackKeyRef.current !== targetKey) {
+        fitView({ duration: 500, padding: 0.3 });
+        fallbackKeyRef.current = targetKey;
+      }
       setTourFitPending(false);
     };
     rafId = requestAnimationFrame(tick);
@@ -154,7 +169,7 @@ function TourFitView() {
       cancelled = true;
       cancelAnimationFrame(rafId);
     };
-  }, [tourHighlightedNodeIds, fitView, getInternalNode, setTourFitPending]);
+  }, [tourHighlightedNodeIds, nodes, fitView, getInternalNode, setTourFitPending]);
 
   return null;
 }
