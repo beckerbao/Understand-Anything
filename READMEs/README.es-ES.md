@@ -175,26 +175,25 @@ Understand-Anything funciona en múltiples plataformas de codificación con IA.
 /plugin install understand-anything
 ```
 
-### Codex
+### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / VS Code Copilot)
 
-Dile a Codex:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.codex/INSTALL.md
-```
-
-### OpenCode
-
-Dile a OpenCode:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+# o pasa la plataforma directamente para saltar el prompt:
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
 ```
 
-### OpenClaw
+**Windows (PowerShell):**
+```powershell
+iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+```
 
-Dile a OpenClaw:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.openclaw/INSTALL.md
-```
+El instalador clona el repositorio en `~/.understand-anything/repo` y crea los enlaces simbólicos correspondientes para la plataforma elegida. Reinicia tu CLI/IDE al terminar.
+
+- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vscode`
+- Actualizar más adelante: `./install.sh --update`
+- Desinstalar: `./install.sh --uninstall <platform>`
 
 ### Cursor
 
@@ -204,10 +203,7 @@ Cursor detecta automáticamente el plugin a través de `.cursor-plugin/plugin.js
 
 VS Code con GitHub Copilot (v1.108+) detecta automáticamente el plugin a través de `.copilot-plugin/plugin.json` cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en VS Code.
 
-Para habilidades personales (disponibles en todos los proyectos), dile a GitHub Copilot:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
-```
+Para habilidades personales (disponibles en todos los proyectos), ejecuta el `install.sh` de arriba con la plataforma `vscode`.
 
 ### Copilot CLI
 
@@ -215,41 +211,20 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 ```
 
-### Antigravity
-
-Dile a Antigravity:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.antigravity/INSTALL.md
-```
-
-### Gemini CLI
-
-Dile a Gemini CLI:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.gemini/INSTALL.md
-```
-
-### Pi Agent
-
-Dile a Pi Agent:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.pi/INSTALL.md
-```
-
 ### Compatibilidad de Plataformas
 
 | Plataforma | Estado | Método de Instalación |
 |----------|--------|----------------|
 | Claude Code | ✅ Nativo | Marketplace de plugins |
-| Codex | ✅ Soportado | Instalación guiada por IA |
-| OpenCode | ✅ Soportado | Instalación guiada por IA |
-| OpenClaw | ✅ Soportado | Instalación guiada por IA |
 | Cursor | ✅ Soportado | Detección automática |
 | VS Code + GitHub Copilot | ✅ Soportado | Detección automática |
 | Copilot CLI | ✅ Soportado | Instalación de plugin |
-| Antigravity | ✅ Soportado | Instalación guiada por IA |
-| Gemini CLI | ✅ Soportado | Instalación guiada por IA |
-| Pi Agent | ✅ Soportado | Instalación guiada por IA |
+| Codex | ✅ Soportado | `install.sh codex` |
+| OpenCode | ✅ Soportado | `install.sh opencode` |
+| OpenClaw | ✅ Soportado | `install.sh openclaw` |
+| Antigravity | ✅ Soportado | `install.sh antigravity` |
+| Gemini CLI | ✅ Soportado | `install.sh gemini` |
+| Pi Agent | ✅ Soportado | `install.sh pi` |
 
 ---
 

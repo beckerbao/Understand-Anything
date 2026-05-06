@@ -176,26 +176,25 @@ Understand-Anything birden fazla AI kodlama platformunda çalışır.
 /plugin install understand-anything
 ```
 
-### Codex
+### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / VS Code Copilot)
 
-Codex'e söyle:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.codex/INSTALL.md
-```
-
-### OpenCode
-
-OpenCode'a söyle:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+# veya platformu doğrudan geçirerek soruyu atla:
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
 ```
 
-### OpenClaw
+**Windows (PowerShell):**
+```powershell
+iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+```
 
-OpenClaw'a söyle:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.openclaw/INSTALL.md
-```
+Kurulum betiği depoyu `~/.understand-anything/repo` dizinine klonlar ve seçilen platform için uygun sembolik bağlantıları oluşturur. Sonrasında CLI/IDE'ni yeniden başlat.
+
+- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vscode`
+- Daha sonra güncelle: `./install.sh --update`
+- Kaldır: `./install.sh --uninstall <platform>`
 
 ### Cursor
 
@@ -205,10 +204,7 @@ Bu depo klonlandığında Cursor, eklentiyi `.cursor-plugin/plugin.json` aracıl
 
 GitHub Copilot uzantısı (v1.108+) yüklü VS Code, `.copilot-plugin/plugin.json` aracılığıyla eklentiyi otomatik keşfeder. Manuel kurulum gerekmez — sadece klonla ve VS Code'da aç.
 
-Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen GitHub Copilot'a söyle:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
-```
+Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıdaki `install.sh`'ı `vscode` platformuyla çalıştır.
 
 ### Copilot CLI
 
@@ -216,41 +212,20 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 ```
 
-### Antigravity
-
-Antigravity'e söyle:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.antigravity/INSTALL.md
-```
-
-### Gemini CLI
-
-Gemini CLI'a söyle:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.gemini/INSTALL.md
-```
-
-### Pi Agent
-
-Pi Agent'a söyle:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.pi/INSTALL.md
-```
-
 ### Platform Uyumluluğu
 
 | Platform | Durum | Kurulum Yöntemi |
 |----------|--------|----------------|
 | Claude Code | ✅ Yerli | Eklenti pazarı |
-| Codex | ✅ Destekleniyor | AI güdümlü kurulum |
-| OpenCode | ✅ Destekleniyor | AI güdümlü kurulum |
-| OpenClaw | ✅ Destekleniyor | AI güdümlü kurulum |
 | Cursor | ✅ Destekleniyor | Otomatik keşif |
 | VS Code + GitHub Copilot | ✅ Destekleniyor | Otomatik keşif |
 | Copilot CLI | ✅ Destekleniyor | Eklenti kurulumu |
-| Antigravity | ✅ Destekleniyor | AI güdümlü kurulum |
-| Gemini CLI | ✅ Destekleniyor | AI güdümlü kurulum |
-| Pi Agent | ✅ Destekleniyor | AI güdümlü kurulum |
+| Codex | ✅ Destekleniyor | `install.sh codex` |
+| OpenCode | ✅ Destekleniyor | `install.sh opencode` |
+| OpenClaw | ✅ Destekleniyor | `install.sh openclaw` |
+| Antigravity | ✅ Destekleniyor | `install.sh antigravity` |
+| Gemini CLI | ✅ Destekleniyor | `install.sh gemini` |
+| Pi Agent | ✅ Destekleniyor | `install.sh pi` |
 
 ---
 

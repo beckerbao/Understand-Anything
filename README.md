@@ -176,26 +176,25 @@ Understand-Anything works across multiple AI coding platforms.
 /plugin install understand-anything
 ```
 
-### Codex
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / VS Code Copilot)
 
-Tell Codex:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.codex/INSTALL.md
-```
-
-### OpenCode
-
-Tell OpenCode:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+# or skip the prompt by passing the platform:
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
 ```
 
-### OpenClaw
+**Windows (PowerShell):**
+```powershell
+iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+```
 
-Tell OpenClaw:
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.openclaw/INSTALL.md
-```
+The installer clones the repo to `~/.understand-anything/repo` and creates the right symlinks for the chosen platform. Restart your CLI/IDE afterwards.
+
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vscode`
+- Update later: `./install.sh --update`
+- Uninstall: `./install.sh --uninstall <platform>`
 
 ### Cursor
 
@@ -205,10 +204,7 @@ Cursor auto-discovers the plugin via `.cursor-plugin/plugin.json` when this repo
 
 VS Code with GitHub Copilot (v1.108+) auto-discovers the plugin via `.copilot-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in VS Code.
 
-For personal skills (available across all projects), tell GitHub Copilot:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
-```
+For personal skills (available across all projects), run the `install.sh` above with the `vscode` platform.
 
 ### Copilot CLI
 
@@ -216,41 +212,20 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 ```
 
-### Antigravity
-
-Tell Antigravity:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.antigravity/INSTALL.md
-```
-
-### Gemini CLI
-
-Tell Gemini CLI:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.gemini/INSTALL.md
-```
-
-### Pi Agent
-
-Tell Pi Agent:
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.pi/INSTALL.md
-```
-
 ### Platform Compatibility
 
 | Platform | Status | Install Method |
 |----------|--------|----------------|
 | Claude Code | ✅ Native | Plugin marketplace |
-| Codex | ✅ Supported | AI-driven install |
-| OpenCode | ✅ Supported | AI-driven install |
-| OpenClaw | ✅ Supported | AI-driven install |
 | Cursor | ✅ Supported | Auto-discovery |
 | VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
 | Copilot CLI | ✅ Supported | Plugin install |
-| Antigravity | ✅ Supported | AI-driven install |
-| Gemini CLI | ✅ Supported | AI-driven install |
-| Pi Agent | ✅ Supported | AI-driven install |
+| Codex | ✅ Supported | `install.sh codex` |
+| OpenCode | ✅ Supported | `install.sh opencode` |
+| OpenClaw | ✅ Supported | `install.sh openclaw` |
+| Antigravity | ✅ Supported | `install.sh antigravity` |
+| Gemini CLI | ✅ Supported | `install.sh gemini` |
+| Pi Agent | ✅ Supported | `install.sh pi` |
 
 ---
 

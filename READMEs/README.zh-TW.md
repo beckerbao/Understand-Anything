@@ -168,33 +168,32 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 
 Understand-Anything 可在多個 AI 編碼平台上執行。
 
-### Claude Code（原生支援）
+### Claude Code（原生）
 
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
 ```
 
-### Codex
+### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / VS Code Copilot）
 
-告訴 Codex：
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.codex/INSTALL.md
-```
-
-### OpenCode
-
-告訴 OpenCode：
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.opencode/INSTALL.md
+**macOS / Linux：**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+# 也可以直接傳入平台名稱跳過互動提示：
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
 ```
 
-### OpenClaw
+**Windows（PowerShell）：**
+```powershell
+iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+```
 
-告訴 OpenClaw：
-```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.openclaw/INSTALL.md
-```
+安裝指令稿會將儲存庫複製到 `~/.understand-anything/repo`，並為所選平台建立相應的符號連結。安裝完成後請重新啟動 CLI 或 IDE。
+
+- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vscode`
+- 後續更新：`./install.sh --update`
+- 解除安裝：`./install.sh --uninstall <platform>`
 
 ### Cursor
 
@@ -204,10 +203,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 
 安裝 GitHub Copilot 擴充功能（v1.108+）後，VS Code 會透過 `.copilot-plugin/plugin.json` 自動發現外掛程式，複製後直接在 VS Code 中開啟即可，無需手動安裝。
 
-若需要在所有專案中使用（個人技能），告訴 GitHub Copilot：
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.vscode/INSTALL.md
-```
+若需要在所有專案中使用（個人技能），執行上面的 `install.sh` 並選擇 `vscode` 平台即可。
 
 ### Copilot CLI
 
@@ -215,41 +211,20 @@ Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Und
 copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 ```
 
-### Antigravity
-
-告訴 Antigravity：
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.antigravity/INSTALL.md
-```
-
-### Gemini CLI
-
-告訴 Gemini CLI：
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.gemini/INSTALL.md
-```
-
-### Pi Agent
-
-告訴 Pi Agent：
-```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/.pi/INSTALL.md
-```
-
 ### 多平台相容性
 
 | 平台 | 狀態 | 安裝方式 |
 |----------|--------|----------------|
 | Claude Code | ✅ 原生 | 外掛程式市集 |
-| Codex | ✅ 支援 | AI 驅動安裝 |
-| OpenCode | ✅ 支援 | AI 驅動安裝 |
-| OpenClaw | ✅ 支援 | AI 驅動安裝 |
 | Cursor | ✅ 支援 | 自動發現 |
 | VS Code + GitHub Copilot | ✅ 支援 | 自動發現 |
 | Copilot CLI | ✅ 支援 | 外掛程式安裝 |
-| Antigravity | ✅ 支援 | AI 驅動安裝 |
-| Gemini CLI | ✅ 支援 | AI 驅動安裝 |
-| Pi Agent | ✅ 支援 | AI 驅動安裝 |
+| Codex | ✅ 支援 | `install.sh codex` |
+| OpenCode | ✅ 支援 | `install.sh opencode` |
+| OpenClaw | ✅ 支援 | `install.sh openclaw` |
+| Antigravity | ✅ 支援 | `install.sh antigravity` |
+| Gemini CLI | ✅ 支援 | `install.sh gemini` |
+| Pi Agent | ✅ 支援 | `install.sh pi` |
 
 ---
 
