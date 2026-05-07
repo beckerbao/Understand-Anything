@@ -516,6 +516,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         isExpanded: false,
         hasSearchHits: false,
         isDiffAffected: false, // Task 14 will populate this
+        isImpactAffected: false,
         isFocusedViaChild: false,
         onToggle: handleContainerToggle,
       },
@@ -540,6 +541,10 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           isDiffChanged: diffMode && changedNodeIds.has(node.id),
           isDiffAffected: diffMode && affectedNodeIds.has(node.id),
           isDiffFaded: diffMode && !changedNodeIds.has(node.id) && !affectedNodeIds.has(node.id),
+          isImpactSeed: false,
+          isImpactUpstream: false,
+          isImpactDownstream: false,
+          isImpactFaded: false,
           isNeighbor: false,
           isSelectionFaded: false,
           onNodeClick: handleNodeSelect,
@@ -896,6 +901,11 @@ function buildCustomFlowNode(
     diffMode: boolean;
     changedNodeIds: Set<string>;
     affectedNodeIds: Set<string>;
+    impactMode: boolean;
+    impactSeedNodeIds: Set<string>;
+    impactUpstreamNodeIds: Set<string>;
+    impactDownstreamNodeIds: Set<string>;
+    impactNodeIds: Set<string>;
     onNodeClick: (nodeId: string) => void;
   },
 ): CustomFlowNode {
@@ -918,6 +928,10 @@ function buildCustomFlowNode(
         opts.diffMode &&
         !opts.changedNodeIds.has(node.id) &&
         !opts.affectedNodeIds.has(node.id),
+      isImpactSeed: opts.impactMode && opts.impactSeedNodeIds.has(node.id),
+      isImpactUpstream: opts.impactMode && opts.impactUpstreamNodeIds.has(node.id),
+      isImpactDownstream: opts.impactMode && opts.impactDownstreamNodeIds.has(node.id),
+      isImpactFaded: opts.impactMode && !opts.impactNodeIds.has(node.id),
       isNeighbor: false,
       isSelectionFaded: false,
       onNodeClick: opts.onNodeClick,
@@ -948,6 +962,11 @@ function useLayerDetailGraph() {
   const diffMode = useDashboardStore((s) => s.diffMode);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
+  const impactMode = useDashboardStore((s) => s.impactMode);
+  const impactSeedNodeIds = useDashboardStore((s) => s.impactSeedNodeIds);
+  const impactUpstreamNodeIds = useDashboardStore((s) => s.impactUpstreamNodeIds);
+  const impactDownstreamNodeIds = useDashboardStore((s) => s.impactDownstreamNodeIds);
+  const impactNodeIds = useDashboardStore((s) => s.impactNodeIds);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const selectNode = useDashboardStore((s) => s.selectNode);
 
@@ -977,6 +996,11 @@ function useLayerDetailGraph() {
           diffMode,
           changedNodeIds,
           affectedNodeIds,
+          impactMode,
+          impactSeedNodeIds,
+          impactUpstreamNodeIds,
+          impactDownstreamNodeIds,
+          impactNodeIds,
           onNodeClick: handleNodeSelect,
         });
         out.push({
@@ -996,6 +1020,11 @@ function useLayerDetailGraph() {
     diffMode,
     changedNodeIds,
     affectedNodeIds,
+    impactMode,
+    impactSeedNodeIds,
+    impactUpstreamNodeIds,
+    impactDownstreamNodeIds,
+    impactNodeIds,
     handleNodeSelect,
   ]);
 
@@ -1027,6 +1056,16 @@ function useLayerDetailGraph() {
     }
     return s;
   }, [diffMode, changedNodeIds, affectedNodeIds, topo.nodeToContainer]);
+
+  const impactContainers = useMemo(() => {
+    const s = new Set<string>();
+    if (!impactMode) return s;
+    for (const id of impactNodeIds) {
+      const cid = topo.nodeToContainer.get(id);
+      if (cid && cid !== id) s.add(cid);
+    }
+    return s;
+  }, [impactMode, impactNodeIds, topo.nodeToContainer]);
 
   // O(filteredEdges) — focus node's container + 1-hop neighbor containers.
   const focusContainerIds = useMemo(() => {
@@ -1100,6 +1139,7 @@ function useLayerDetailGraph() {
         const hasSearchHits = rawHits > 0;
         const searchHitCount = hasSearchHits ? rawHits : undefined;
         const isDiffAffected = diffContainers.has(cid);
+        const isImpactAffected = impactContainers.has(cid);
         const isFocusedViaChild =
           focusContainerIds.has(cid) || selectionContainerIds.has(cid);
 
@@ -1109,6 +1149,7 @@ function useLayerDetailGraph() {
           data.hasSearchHits === hasSearchHits &&
           data.searchHitCount === searchHitCount &&
           data.isDiffAffected === isDiffAffected &&
+          data.isImpactAffected === isImpactAffected &&
           data.isFocusedViaChild === isFocusedViaChild
         ) {
           return node;
@@ -1122,6 +1163,7 @@ function useLayerDetailGraph() {
             hasSearchHits,
             searchHitCount,
             isDiffAffected,
+            isImpactAffected,
             isFocusedViaChild,
           },
         };
@@ -1143,13 +1185,32 @@ function useLayerDetailGraph() {
         data.searchScore === searchScore &&
         data.isSelected === isSelected &&
         data.isTourHighlighted === isTourHighlighted &&
+        data.isImpactSeed === (impactMode && impactSeedNodeIds.has(node.id)) &&
+        data.isImpactUpstream === (impactMode && impactUpstreamNodeIds.has(node.id)) &&
+        data.isImpactDownstream === (impactMode && impactDownstreamNodeIds.has(node.id)) &&
+        data.isImpactFaded === (impactMode && !impactNodeIds.has(node.id)) &&
         data.isNeighbor === isNeighbor &&
         data.isSelectionFaded === isSelectionFaded
       ) {
         return node;
       }
 
-      return { ...node, data: { ...data, isHighlighted, searchScore, isSelected, isTourHighlighted, isNeighbor, isSelectionFaded } };
+      return {
+        ...node,
+        data: {
+          ...data,
+          isHighlighted,
+          searchScore,
+          isSelected,
+          isTourHighlighted,
+          isImpactSeed: impactMode && impactSeedNodeIds.has(node.id),
+          isImpactUpstream: impactMode && impactUpstreamNodeIds.has(node.id),
+          isImpactDownstream: impactMode && impactDownstreamNodeIds.has(node.id),
+          isImpactFaded: impactMode && !impactNodeIds.has(node.id),
+          isNeighbor,
+          isSelectionFaded,
+        },
+      };
     });
   }, [
     topo.nodes,
@@ -1161,6 +1222,12 @@ function useLayerDetailGraph() {
     expandedContainers,
     searchHitsByContainer,
     diffContainers,
+    impactContainers,
+    impactMode,
+    impactSeedNodeIds,
+    impactUpstreamNodeIds,
+    impactDownstreamNodeIds,
+    impactNodeIds,
     focusContainerIds,
     selectionContainerIds,
   ]);

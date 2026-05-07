@@ -70,6 +70,10 @@ export interface CustomNodeData extends Record<string, unknown> {
   isDiffChanged: boolean;
   isDiffAffected: boolean;
   isDiffFaded: boolean;
+  isImpactSeed: boolean;
+  isImpactUpstream: boolean;
+  isImpactDownstream: boolean;
+  isImpactFaded: boolean;
   isNeighbor: boolean;
   isSelectionFaded: boolean;
   onNodeClick?: (nodeId: string) => void;
@@ -116,6 +120,16 @@ function CustomNodeComponent({
     extraClass += " ring-1 ring-[var(--color-diff-affected)] diff-affected-glow";
   } else if (data.isDiffFaded) {
     extraClass += " diff-faded";
+  }
+
+  if (data.isImpactSeed) {
+    extraClass += " ring-2 ring-[var(--color-accent-bright)] shadow-[0_0_0_1px_rgba(212,165,116,0.35)]";
+  } else if (data.isImpactUpstream) {
+    extraClass += " ring-2 ring-[#5ca8ff] shadow-[0_0_0_1px_rgba(92,168,255,0.35)]";
+  } else if (data.isImpactDownstream) {
+    extraClass += " ring-2 ring-[#e1a85c] shadow-[0_0_0_1px_rgba(225,168,92,0.35)]";
+  } else if (data.isImpactFaded) {
+    extraClass += " opacity-25";
   }
 
   // Selection-based dimming (when another node is selected, fade unrelated nodes)

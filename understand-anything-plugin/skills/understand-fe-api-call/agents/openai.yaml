@@ -1,0 +1,7 @@
+interface:
+  display_name: "FE API Calls"
+  short_description: "Extract FE-to-BE endpoint calls"
+  default_prompt: "Use $understand-fe-api-call to extract frontend-to-backend API calls from the structural knowledge graph and update endpoint nodes plus calls edges."
+
+policy:
+  allow_implicit_invocation: true

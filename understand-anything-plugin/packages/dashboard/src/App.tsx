@@ -9,6 +9,7 @@ import SearchBar from "./components/SearchBar";
 import NodeInfo from "./components/NodeInfo";
 import LayerLegend from "./components/LayerLegend";
 import DiffToggle from "./components/DiffToggle";
+import ImpactToggle from "./components/ImpactToggle";
 import FilterPanel from "./components/FilterPanel";
 import ExportMenu from "./components/ExportMenu";
 import PersonaSelector from "./components/PersonaSelector";
@@ -44,6 +45,7 @@ function dataUrl(fileName: string, token: string | null): string {
       "domain-graph.json": import.meta.env.VITE_DOMAIN_GRAPH_URL,
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
+      "impact-overlay.json": import.meta.env.VITE_IMPACT_OVERLAY_URL,
     };
     const url = envMap[fileName];
     if (url) return url;
@@ -105,6 +107,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const expandCodeViewer = useDashboardStore((s) => s.expandCodeViewer);
   const collapseCodeViewer = useDashboardStore((s) => s.collapseCodeViewer);
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
+  const setImpactOverlay = useDashboardStore((s) => s.setImpactOverlay);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
   const togglePathFinder = useDashboardStore((s) => s.togglePathFinder);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
@@ -320,6 +323,52 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setDiffOverlay]);
 
   useEffect(() => {
+    fetch(dataUrl("impact-overlay.json", accessToken))
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data: unknown) => {
+        if (data && typeof data === "object") {
+          const payload = data as {
+            nodes?: {
+              seedNodeIds?: unknown;
+              upstreamNodeIds?: unknown;
+              downstreamNodeIds?: unknown;
+              impactNodeIds?: unknown;
+            };
+          };
+          const nodes = payload.nodes;
+          if (
+            nodes &&
+            Array.isArray(nodes.seedNodeIds) &&
+            Array.isArray(nodes.upstreamNodeIds) &&
+            Array.isArray(nodes.downstreamNodeIds) &&
+            Array.isArray(nodes.impactNodeIds)
+          ) {
+            const normalized = nodes as {
+              seedNodeIds: string[];
+              upstreamNodeIds: string[];
+              downstreamNodeIds: string[];
+              impactNodeIds: string[];
+            };
+            if (normalized.seedNodeIds.length > 0) {
+              setImpactOverlay(
+                normalized.seedNodeIds,
+                normalized.upstreamNodeIds,
+                normalized.downstreamNodeIds,
+                normalized.impactNodeIds,
+              );
+            }
+          }
+        }
+      })
+      .catch(() => {
+        // Silently ignore - impact overlay is optional
+      });
+  }, [setImpactOverlay]);
+
+  useEffect(() => {
     fetch(dataUrl("domain-graph.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
@@ -443,6 +492,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-4 w-max">
             <DiffToggle />
+            <ImpactToggle />
             <div className="flex items-center gap-1">
               {(isKnowledgeGraph ? [
                 { key: "knowledge" as const, label: "All", color: "var(--color-node-article)" },

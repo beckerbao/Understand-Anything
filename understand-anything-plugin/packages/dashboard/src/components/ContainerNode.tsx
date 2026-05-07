@@ -12,6 +12,7 @@ export interface ContainerNodeData extends Record<string, unknown> {
   hasSearchHits: boolean;
   searchHitCount?: number;
   isDiffAffected: boolean;
+  isImpactAffected: boolean;
   isFocusedViaChild: boolean;
   onToggle: (containerId: string) => void;
 }
@@ -23,6 +24,8 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
 
   const borderColor = data.isDiffAffected
     ? "var(--color-diff-changed)"
+    : data.isImpactAffected
+      ? "rgba(92,168,255,0.6)"
     : data.isExpanded || data.isFocusedViaChild
       ? "rgba(212,165,116,0.6)"
       : "rgba(212,165,116,0.25)";

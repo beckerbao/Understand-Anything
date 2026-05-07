@@ -129,6 +129,12 @@ interface DashboardStore {
   changedNodeIds: Set<string>;
   affectedNodeIds: Set<string>;
 
+  impactMode: boolean;
+  impactSeedNodeIds: Set<string>;
+  impactUpstreamNodeIds: Set<string>;
+  impactDownstreamNodeIds: Set<string>;
+  impactNodeIds: Set<string>;
+
   // Focus mode: isolate a node's 1-hop neighborhood
   focusNodeId: string | null;
 
@@ -163,8 +169,11 @@ interface DashboardStore {
   collapseCodeViewer: () => void;
 
   setDiffOverlay: (changed: string[], affected: string[]) => void;
+  setImpactOverlay: (seed: string[], upstream: string[], downstream: string[], impact: string[]) => void;
   toggleDiffMode: () => void;
+  toggleImpactMode: () => void;
   clearDiffOverlay: () => void;
+  clearImpactOverlay: () => void;
 
   toggleFilterPanel: () => void;
   toggleExportMenu: () => void;
@@ -305,6 +314,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   changedNodeIds: new Set<string>(),
   affectedNodeIds: new Set<string>(),
 
+  impactMode: false,
+  impactSeedNodeIds: new Set<string>(),
+  impactUpstreamNodeIds: new Set<string>(),
+  impactDownstreamNodeIds: new Set<string>(),
+  impactNodeIds: new Set<string>(),
+
   focusNodeId: null,
   nodeHistory: [],
 
@@ -380,9 +395,21 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   navigateToNodeInLayer: (nodeId) => {
-    const { graph, selectedNodeId, nodeHistory, nodeIdToLayerId } = get();
+    const { graph, selectedNodeId, nodeHistory, nodeIdToLayerId, nodesById } = get();
     if (!graph) return;
-    const layerId = nodeIdToLayerId.get(nodeId) ?? null;
+    const directLayerId = nodeIdToLayerId.get(nodeId) ?? null;
+    const node = nodesById.get(nodeId) ?? null;
+    const fallbackFileLayerId =
+      !directLayerId && node?.filePath
+        ? (() => {
+            const fileNode = graph.nodes.find(
+              (candidate) =>
+                candidate.type === "file" && candidate.filePath === node.filePath,
+            );
+            return fileNode ? nodeIdToLayerId.get(fileNode.id) ?? null : null;
+          })()
+        : null;
+    const layerId = directLayerId ?? fallbackFileLayerId;
     const newHistory =
       selectedNodeId && nodeId !== selectedNodeId
         ? [...nodeHistory, selectedNodeId].slice(-MAX_HISTORY)
@@ -524,13 +551,32 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       affectedNodeIds: new Set(affected),
     }),
 
+  setImpactOverlay: (seed, upstream, downstream, impact) =>
+    set({
+      impactMode: true,
+      impactSeedNodeIds: new Set(seed),
+      impactUpstreamNodeIds: new Set(upstream),
+      impactDownstreamNodeIds: new Set(downstream),
+      impactNodeIds: new Set(impact),
+    }),
+
   toggleDiffMode: () => set((state) => ({ diffMode: !state.diffMode })),
+  toggleImpactMode: () => set((state) => ({ impactMode: !state.impactMode })),
 
   clearDiffOverlay: () =>
     set({
       diffMode: false,
       changedNodeIds: new Set<string>(),
       affectedNodeIds: new Set<string>(),
+    }),
+
+  clearImpactOverlay: () =>
+    set({
+      impactMode: false,
+      impactSeedNodeIds: new Set<string>(),
+      impactUpstreamNodeIds: new Set<string>(),
+      impactDownstreamNodeIds: new Set<string>(),
+      impactNodeIds: new Set<string>(),
     }),
 
   toggleFilterPanel: () => set((state) => ({
@@ -750,4 +796,3 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }),
   clearLayoutIssues: () => set({ layoutIssues: [] }),
 }));
-

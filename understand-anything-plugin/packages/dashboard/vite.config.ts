@@ -251,6 +251,7 @@ export default defineConfig({
             pathname === "/knowledge-graph.json" ||
             pathname === "/domain-graph.json" ||
             pathname === "/diff-overlay.json" ||
+            pathname === "/impact-overlay.json" ||
             pathname === "/meta.json" ||
             pathname === "/file-content.json";
 
@@ -275,6 +276,8 @@ export default defineConfig({
           const fileName =
             pathname === "/diff-overlay.json"
               ? "diff-overlay.json"
+              : pathname === "/impact-overlay.json"
+              ? "impact-overlay.json"
               : pathname === "/meta.json"
               ? "meta.json"
               : pathname === "/domain-graph.json"

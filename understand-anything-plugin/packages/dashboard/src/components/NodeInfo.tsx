@@ -314,6 +314,11 @@ export default function NodeInfo() {
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const impactMode = useDashboardStore((s) => s.impactMode);
+  const impactSeedNodeIds = useDashboardStore((s) => s.impactSeedNodeIds);
+  const impactUpstreamNodeIds = useDashboardStore((s) => s.impactUpstreamNodeIds);
+  const impactDownstreamNodeIds = useDashboardStore((s) => s.impactDownstreamNodeIds);
+  const impactNodeIds = useDashboardStore((s) => s.impactNodeIds);
 
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
   const node = activeGraph?.nodes.find((n) => n.id === selectedNodeId) ?? null;
@@ -426,6 +431,31 @@ export default function NodeInfo() {
       <p className="text-sm text-text-secondary mb-4 leading-relaxed">
         {node.summary}
       </p>
+
+      {impactMode && impactNodeIds.size > 0 && impactNodeIds.has(node.id) && (
+        <div className="mb-4 rounded-lg border border-[rgba(92,168,255,0.25)] bg-[rgba(92,168,255,0.06)] p-3">
+          <h3 className="text-[11px] font-semibold text-[#8ec5ff] uppercase tracking-wider mb-2">
+            Impact
+          </h3>
+          <div className="flex flex-wrap gap-1.5 text-[11px]">
+            {impactSeedNodeIds.has(node.id) && (
+              <span className="px-2 py-0.5 rounded-full bg-[rgba(212,165,116,0.16)] text-[var(--color-accent-bright)]">
+                Seed
+              </span>
+            )}
+            {impactUpstreamNodeIds.has(node.id) && (
+              <span className="px-2 py-0.5 rounded-full bg-[rgba(92,168,255,0.16)] text-[#8ec5ff]">
+                Upstream
+              </span>
+            )}
+            {impactDownstreamNodeIds.has(node.id) && (
+              <span className="px-2 py-0.5 rounded-full bg-[rgba(225,168,92,0.16)] text-[#f0c27a]">
+                Downstream
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {node.filePath && (
         <div className="text-xs text-text-secondary mb-4 rounded-lg border border-border-subtle bg-elevated/60 p-3">

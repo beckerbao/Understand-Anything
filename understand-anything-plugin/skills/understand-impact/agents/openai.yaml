@@ -1,0 +1,7 @@
+interface:
+  display_name: "Impact Analysis"
+  short_description: "Compute upstream/downstream blast radius"
+  default_prompt: "Use $understand-impact to analyze blast radius from a seed node or file. Probe the structural knowledge graph first, decide whether the impact is narrow or needs deep call-chain enrichment, run the optional callgraph enricher only when the 1-hop structural view is too shallow, then write an impact overlay and tell the user to reload the dashboard."
+
+policy:
+  allow_implicit_invocation: true
