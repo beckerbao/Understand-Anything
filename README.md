@@ -272,6 +272,30 @@ The `/understand` command orchestrates 5 specialized agents, and `/understand-do
 
 File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 
+### Multi-Agent Pipeline Skills
+
+The pipeline also includes two focused follow-up skills for impact analysis and FE-to-BE endpoint tracing:
+
+| Skill | When to use it | Output |
+|-------|----------------|--------|
+| `/understand-impact` | You want to know what changes if a file, function, class, or endpoint changes | `.understand-anything/impact-overlay.json` |
+| `/understand-fe-be-api` | You want to extract which backend endpoints the FE calls | `.understand-anything/callgraph-overlay.json` and updated structural graph references |
+
+In this repository, the FE-to-BE API tracing skill is implemented as `/understand-fe-api-call`.
+
+Recommended order:
+
+1. Run `/understand` first to build or refresh the structural knowledge graph.
+2. Run `/understand-impact` when you need upstream/downstream blast-radius analysis.
+3. Run `/understand-fe-api-call` when you need FE-to-BE API call mapping in the graph.
+
+Notes:
+
+- `/understand-impact` requires a `seed`, which is the starting node for impact analysis. A seed can be a file, function, class, endpoint, or a close match that the skill resolves to one of those nodes.
+- `/understand-impact` reads the existing structural graph first, then computes impact overlays. If the graph is stale, rerun `/understand` before analyzing impact.
+- `/understand-fe-api-call` is the focused API-tracing step for frontend codebases. It labels endpoint nodes and makes backend dependencies visible in the graph.
+- Both skills complement the main `/understand` pipeline rather than replace it.
+
 ---
 
 ## 🤝 Contributing
