@@ -19,7 +19,11 @@ import type { GraphEdge, GraphNode } from "@understand-anything/core/types";
 
 const nodeTypes = { custom: CustomNode };
 
-function toCustomNode(node: GraphNode, onClick: (id: string) => void): CustomFlowNode {
+function toCustomNode(
+  node: GraphNode,
+  onClick: (id: string) => void,
+  isSelectionFaded = false,
+): CustomFlowNode {
   return {
     id: node.id,
     type: "custom",
@@ -40,7 +44,7 @@ function toCustomNode(node: GraphNode, onClick: (id: string) => void): CustomFlo
       isImpactDownstream: false,
       isImpactFaded: false,
       isNeighbor: false,
-      isSelectionFaded: false,
+      isSelectionFaded,
       onNodeClick: onClick,
     },
   };
@@ -73,20 +77,93 @@ function toFlowEdge(edge: GraphEdge, idx: number): Edge {
 function EndpointGraphViewInner() {
   const endpointGraph = useDashboardStore((s) => s.endpointGraph);
   const selectNode = useDashboardStore((s) => s.selectNode);
+  const [activeServiceId, setActiveServiceId] = useState<string | null>(null);
 
   const built = useMemo(() => {
     if (!endpointGraph) return null;
+    const allServices = endpointGraph.nodes.filter((n) => n.type === "service");
+    const allEndpoints = endpointGraph.nodes.filter((n) => n.type === "endpoint");
+    const nodeById = new Map(endpointGraph.nodes.map((n) => [n.id, n]));
+    const edges = endpointGraph.edges;
+
+    const onNodeClick = (id: string) => {
+      const node = nodeById.get(id);
+      if (!node) return;
+      if (node.type === "service") {
+        setActiveServiceId((prev) => (prev === id ? null : id));
+      } else {
+        selectNode(id);
+      }
+    };
+
+    const visibleNodes = new Map<string, GraphNode>();
+    const visibleEdges: GraphEdge[] = [];
+    const highlightNodeIds = new Set<string>();
+
+    // Overview: show only service nodes.
+    if (!activeServiceId) {
+      for (const service of allServices) visibleNodes.set(service.id, service);
+      for (const edge of edges) {
+        if (edge.source.startsWith("service:") && edge.target.startsWith("service:")) {
+          visibleEdges.push(edge);
+        }
+      }
+    } else {
+      // Focused: keep all services visible (dim unrelated), expand connectors for selected service.
+      for (const service of allServices) visibleNodes.set(service.id, service);
+      highlightNodeIds.add(activeServiceId);
+
+      // 1) Selected service -> served endpoints
+      const servedEndpointIds = new Set<string>();
+      for (const edge of edges) {
+        if (edge.type === "serves" && edge.source === activeServiceId) {
+          servedEndpointIds.add(edge.target);
+          visibleEdges.push(edge);
+        }
+      }
+
+      // 2) For each served endpoint, collect direct connector edges + related service nodes
+      for (const endpointId of servedEndpointIds) {
+        const endpointNode = allEndpoints.find((n) => n.id === endpointId);
+        if (!endpointNode) continue;
+        visibleNodes.set(endpointId, endpointNode);
+        highlightNodeIds.add(endpointId);
+
+        for (const edge of edges) {
+          if (edge.source !== endpointId && edge.target !== endpointId) continue;
+          const otherId = edge.source === endpointId ? edge.target : edge.source;
+          const otherNode = nodeById.get(otherId);
+          if (!otherNode) continue;
+
+          // Keep endpoint connector edges and any link to a service.
+          if (
+            edge.type === "depends_on" ||
+            edge.type === "routes" ||
+            edge.type === "implements" ||
+            edge.type === "configures" ||
+            otherNode.type === "service"
+          ) {
+            visibleEdges.push(edge);
+            visibleNodes.set(otherNode.id, otherNode);
+            highlightNodeIds.add(otherNode.id);
+          }
+        }
+      }
+    }
+
     const dims = new Map<string, { width: number; height: number }>();
-    const nodes: Node[] = endpointGraph.nodes.map((node) => {
-      dims.set(node.id, { width: 220, height: 120 });
-      return toCustomNode(node, selectNode) as unknown as Node;
+    const nodes: Node[] = [...visibleNodes.values()].map((node) => {
+      const isService = node.type === "service";
+      dims.set(node.id, { width: isService ? 250 : 220, height: isService ? 130 : 120 });
+      const faded = Boolean(activeServiceId) && !highlightNodeIds.has(node.id);
+      return toCustomNode(node, onNodeClick, faded) as unknown as Node;
     });
-    const nodeIds = new Set(endpointGraph.nodes.map((n) => n.id));
-    const edges: Edge[] = endpointGraph.edges
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const graphEdges: Edge[] = visibleEdges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
       .map((e, i) => toFlowEdge(e, i));
-    return { nodes, edges, dims };
-  }, [endpointGraph, selectNode]);
+    return { nodes, edges: graphEdges, dims };
+  }, [endpointGraph, selectNode, activeServiceId]);
 
   const [layout, setLayout] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
@@ -132,8 +209,9 @@ function EndpointGraphViewInner() {
   }
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative">
       <ReactFlow
+        key={`endpoint-${activeServiceId ?? "overview"}`}
         nodes={layout.nodes}
         edges={layout.edges}
         nodeTypes={nodeTypes}
@@ -156,6 +234,17 @@ function EndpointGraphViewInner() {
           className="!bg-surface !border !border-border-subtle"
         />
       </ReactFlow>
+      {activeServiceId && (
+        <div className="absolute top-3 left-3 z-10">
+          <button
+            type="button"
+            onClick={() => setActiveServiceId(null)}
+            className="px-3 py-1.5 text-xs rounded-lg bg-elevated border border-border-subtle text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Back to services
+          </button>
+        </div>
+      )}
     </div>
   );
 }

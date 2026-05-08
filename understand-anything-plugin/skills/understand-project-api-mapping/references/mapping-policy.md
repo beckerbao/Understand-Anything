@@ -43,7 +43,7 @@ Path normalization rules:
 ## Output Rules
 
 1. Only `high` and `medium` candidates can produce `routes` edges.
-2. `low` candidates become unresolved `concept` nodes with `related` links.
+2. `low` candidates stay unresolved in endpoint metadata (`confidence: low`) and do not produce `routes`.
 3. Always preserve evidence in endpoint node metadata.
 4. Never fabricate downstream endpoints that do not exist in leaf graphs.
-
+5. Project-level graph must stay `service/endpoint` only; never emit function/config/concept nodes.

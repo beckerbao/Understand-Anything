@@ -19,6 +19,11 @@ Answer:
 - Which auth/rate-limit constraints apply on mapped paths
 - Which mappings are unresolved and need manual review
 
+Scope is strictly project API topology:
+
+- `service` and `endpoint` nodes only
+- no function-level or file-level modeling
+
 ## Inputs
 
 - `<project-root>`: master repo that will receive output
@@ -48,4 +53,3 @@ This skill does not run `/understand` for leaf repos.
 - `references/mapping-policy.md`
 - `references/output-schema.md`
 - `agents/openai.yaml`
-

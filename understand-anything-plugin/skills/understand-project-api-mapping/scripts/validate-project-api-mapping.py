@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 
 
-ALLOWED_NODE_TYPES = {"service", "endpoint", "function", "config", "concept"}
-ALLOWED_EDGE_TYPES = {"serves", "routes", "implements", "configures", "depends_on", "related"}
+ALLOWED_NODE_TYPES = {"service", "endpoint"}
+ALLOWED_EDGE_TYPES = {"serves", "routes", "depends_on"}
 
 
 def validate(path: Path) -> list[str]:
@@ -37,6 +37,7 @@ def validate(path: Path) -> list[str]:
         edges = []
 
     node_ids: set[str] = set()
+    node_types_by_id: dict[str, str] = {}
     for i, node in enumerate(nodes):
         if not isinstance(node, dict):
             issues.append(f"node[{i}] must be object")
@@ -49,12 +50,26 @@ def validate(path: Path) -> list[str]:
         if node_id in node_ids:
             issues.append(f"duplicate node id: {node_id}")
         node_ids.add(node_id)
+        node_types_by_id[node_id] = node_type
         if node_type not in ALLOWED_NODE_TYPES:
             issues.append(f"node {node_id} has unsupported type {node_type}")
         if not str(node.get("name", "")).strip():
             issues.append(f"node {node_id} missing name")
         if not str(node.get("summary", "")).strip():
             issues.append(f"node {node_id} missing summary")
+        if node_type == "endpoint":
+            dm = node.get("domainMeta")
+            if not isinstance(dm, dict):
+                issues.append(f"endpoint node {node_id} missing domainMeta")
+            else:
+                if not str(dm.get("service", "")).strip():
+                    issues.append(f"endpoint node {node_id} missing domainMeta.service")
+                if not str(dm.get("method", "")).strip():
+                    issues.append(f"endpoint node {node_id} missing domainMeta.method")
+                if not str(dm.get("path", "")).strip():
+                    issues.append(f"endpoint node {node_id} missing domainMeta.path")
+                if not str(dm.get("canonicalPath", "")).strip():
+                    issues.append(f"endpoint node {node_id} missing domainMeta.canonicalPath")
 
     for i, edge in enumerate(edges):
         if not isinstance(edge, dict):
@@ -72,6 +87,19 @@ def validate(path: Path) -> list[str]:
             issues.append(f"edge[{i}] missing target node: {tgt}")
         if et not in ALLOWED_EDGE_TYPES:
             issues.append(f"edge[{i}] unsupported type: {et}")
+            continue
+
+        src_t = node_types_by_id.get(src, "")
+        tgt_t = node_types_by_id.get(tgt, "")
+        if et == "serves" and not (src_t == "service" and tgt_t == "endpoint"):
+            issues.append(f"edge[{i}] serves must be service->endpoint, got {src_t}->{tgt_t}")
+        elif et == "routes" and not (src_t == "endpoint" and tgt_t == "endpoint"):
+            issues.append(f"edge[{i}] routes must be endpoint->endpoint, got {src_t}->{tgt_t}")
+        elif et == "depends_on" and not (
+            (src_t == "service" and tgt_t == "service")
+            or (src_t == "endpoint" and tgt_t == "service")
+        ):
+            issues.append(f"edge[{i}] depends_on must be service->service or endpoint->service, got {src_t}->{tgt_t}")
 
     return issues
 
@@ -92,4 +120,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

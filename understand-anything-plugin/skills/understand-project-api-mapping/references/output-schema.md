@@ -28,18 +28,12 @@ The output file is:
 
 - `service`
 - `endpoint`
-- `function`
-- `config`
-- `concept`
 
 ## Edge Types
 
 - `serves` (`service -> endpoint`)
 - `routes` (`endpoint -> endpoint`)
-- `implements` (`function -> endpoint`)
-- `configures` (`config -> endpoint|service`)
 - `depends_on` (`service -> service` or `endpoint -> service`)
-- `related` (fallback relation)
 
 ## Endpoint Node Metadata
 
@@ -71,5 +65,4 @@ Endpoint nodes should include `domainMeta` when available:
 2. Every edge must reference existing node IDs.
 3. `routes` edges should carry `weight` between `0.0` and `1.0`.
 4. `endpoint` nodes should include `method` and `path` in `domainMeta` if known.
-5. Unresolved mappings should be represented as `concept` nodes plus `related` edges; do not invent `routes`.
-
+5. Unresolved mappings stay at endpoint metadata level (`confidence: low`) and must not create `routes`.
