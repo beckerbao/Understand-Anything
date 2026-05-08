@@ -270,16 +270,19 @@ The `/understand` command orchestrates 5 specialized agents, and `/understand-do
 | `domain-analyzer` | Extract business domains, flows, and process steps (used by `/understand-domain`) |
 | `article-analyzer` | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`) |
 
+For project-level federation across multiple repos, `/understand-project-knowledge` uses the existing leaf graphs from each service and merges them into a master knowledge base. It does **not** run leaf analysis for you.
+
 File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 
 ### Multi-Agent Pipeline Skills
 
-The pipeline also includes two focused follow-up skills for impact analysis and FE-to-BE endpoint tracing:
+The pipeline also includes focused follow-up skills for impact analysis, FE-to-BE endpoint tracing, and top-level project federation:
 
 | Skill | When to use it | Output |
 |-------|----------------|--------|
 | `/understand-impact` | You want to know what changes if a file, function, class, or endpoint changes | `.understand-anything/impact-overlay.json` |
 | `/understand-fe-be-api` | You want to extract which backend endpoints the FE calls | `.understand-anything/callgraph-overlay.json` and updated structural graph references |
+| `/understand-project-knowledge` | You want to merge multiple leaf repo graphs into a master project knowledge base | Updated top-level project graph in the master repo |
 
 In this repository, the FE-to-BE API tracing skill is implemented as `/understand-fe-api-call`.
 
@@ -288,12 +291,14 @@ Recommended order:
 1. Run `/understand` first to build or refresh the structural knowledge graph.
 2. Run `/understand-impact` when you need upstream/downstream blast-radius analysis.
 3. Run `/understand-fe-api-call` when you need FE-to-BE API call mapping in the graph.
+4. Run `/understand-project-knowledge` when you already have leaf graphs and want a master repo to govern cross-service knowledge.
 
 Notes:
 
 - `/understand-impact` requires a `seed`, which is the starting node for impact analysis. A seed can be a file, function, class, endpoint, or a close match that the skill resolves to one of those nodes.
 - `/understand-impact` reads the existing structural graph first, then computes impact overlays. If the graph is stale, rerun `/understand` before analyzing impact.
 - `/understand-fe-api-call` is the focused API-tracing step for frontend codebases. It labels endpoint nodes and makes backend dependencies visible in the graph.
+- `/understand-project-knowledge` requires the master repo path plus one or more `--leaf` repo paths. Each leaf repo must already have `.understand-anything/domain-graph.json` or `.understand-anything/knowledge-graph.json`.
 - Both skills complement the main `/understand` pipeline rather than replace it.
 
 ---

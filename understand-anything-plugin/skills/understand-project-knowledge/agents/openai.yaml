@@ -1,0 +1,4 @@
+interface:
+  display_name: "Understand Project Knowledge"
+  short_description: "Federate leaf graphs into a project-level knowledge base"
+  default_prompt: "Build a top-level federated project knowledge graph from leaf understand-anything graphs, preserving canonical cross-service rules and ownership boundaries."
