@@ -14,7 +14,7 @@ export type NavigationLevel = "overview" | "layer-detail";
 export type NodeType = "file" | "function" | "class" | "module" | "concept" | "config" | "document" | "service" | "table" | "endpoint" | "pipeline" | "schema" | "resource" | "domain" | "flow" | "step" | "article" | "entity" | "topic" | "claim" | "source";
 export type Complexity = "simple" | "moderate" | "complex";
 export type EdgeCategory = "structural" | "behavioral" | "data-flow" | "dependencies" | "semantic" | "infrastructure" | "domain" | "knowledge";
-export type ViewMode = "structural" | "domain" | "knowledge";
+export type ViewMode = "structural" | "domain" | "endpoint" | "knowledge";
 
 export interface FilterState {
   nodeTypes: Set<NodeType>;
@@ -193,9 +193,11 @@ interface DashboardStore {
   viewMode: ViewMode;
   isKnowledgeGraph: boolean;
   domainGraph: KnowledgeGraph | null;
+  endpointGraph: KnowledgeGraph | null;
   activeDomainId: string | null;
 
   setDomainGraph: (graph: KnowledgeGraph) => void;
+  setEndpointGraph: (graph: KnowledgeGraph) => void;
   setViewMode: (mode: ViewMode) => void;
   setIsKnowledgeGraph: (value: boolean) => void;
   navigateToDomain: (domainId: string) => void;
@@ -350,9 +352,10 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     const searchEngine = new SearchEngine(graph.nodes);
     const query = get().searchQuery;
     const searchResults = query.trim() ? searchEngine.search(query) : [];
-    const { viewMode, domainGraph, activeDomainId } = get();
-    // Preserve domain view if a domain graph is already loaded
+    const { viewMode, domainGraph, endpointGraph, activeDomainId } = get();
+    // Preserve domain/endpoint view if their graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
+    const keepEndpointView = viewMode === "endpoint" && endpointGraph !== null;
     const { nodesById, nodeIdToLayerId, nodeIdToLayerIds } = buildGraphIndexes(graph);
     set({
       graph,
@@ -366,7 +369,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       selectedNodeId: null,
       focusNodeId: null,
       nodeHistory: [],
-      viewMode: keepDomainView ? "domain" as const : "structural" as const,
+      viewMode: keepDomainView
+        ? "domain" as const
+        : keepEndpointView
+          ? "endpoint" as const
+          : "structural" as const,
       activeDomainId: keepDomainView ? activeDomainId : null,
       containerLayoutCache: new Map(),
       expandedContainers: new Set(),
@@ -687,10 +694,15 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   viewMode: "structural",
   isKnowledgeGraph: false,
   domainGraph: null,
+  endpointGraph: null,
   activeDomainId: null,
 
   setDomainGraph: (graph) => {
     set({ domainGraph: graph });
+  },
+
+  setEndpointGraph: (graph) => {
+    set({ endpointGraph: graph });
   },
 
   setIsKnowledgeGraph: (value) => {

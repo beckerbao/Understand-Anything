@@ -1,0 +1,4 @@
+interface:
+  display_name: "Understand API List"
+  short_description: "Index gateway/backend endpoints into KG"
+  default_prompt: "Use $skill-name to extract exposed gateway or backend endpoints and update the knowledge graph with the API list."

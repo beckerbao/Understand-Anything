@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -250,6 +253,7 @@ export default defineConfig({
           const isProtectedEndpoint =
             pathname === "/knowledge-graph.json" ||
             pathname === "/domain-graph.json" ||
+            pathname === "/endpoint-graph.json" ||
             pathname === "/diff-overlay.json" ||
             pathname === "/impact-overlay.json" ||
             pathname === "/meta.json" ||
@@ -282,6 +286,8 @@ export default defineConfig({
               ? "meta.json"
               : pathname === "/domain-graph.json"
               ? "domain-graph.json"
+              : pathname === "/endpoint-graph.json"
+              ? "endpoint-graph.json"
               : "knowledge-graph.json";
 
           const candidates = graphFileCandidates(fileName);

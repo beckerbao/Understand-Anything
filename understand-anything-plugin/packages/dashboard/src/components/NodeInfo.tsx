@@ -314,13 +314,19 @@ export default function NodeInfo() {
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const endpointGraph = useDashboardStore((s) => s.endpointGraph);
   const impactMode = useDashboardStore((s) => s.impactMode);
   const impactSeedNodeIds = useDashboardStore((s) => s.impactSeedNodeIds);
   const impactUpstreamNodeIds = useDashboardStore((s) => s.impactUpstreamNodeIds);
   const impactDownstreamNodeIds = useDashboardStore((s) => s.impactDownstreamNodeIds);
   const impactNodeIds = useDashboardStore((s) => s.impactNodeIds);
 
-  const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
+  const activeGraph =
+    viewMode === "domain" && domainGraph
+      ? domainGraph
+      : viewMode === "endpoint" && endpointGraph
+        ? endpointGraph
+        : graph;
   const node = activeGraph?.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
   // Resolve history node names for the breadcrumb trail

@@ -69,6 +69,8 @@ Use these edge types when useful:
 6. Keep the graph smaller and cleaner than the sum of its leaves.
 7. Every node must have a non-empty summary and at least one tag.
 8. Every edge must connect real nodes in the final output.
+9. When a business journey clearly crosses multiple services in a stable order, synthesize a canonical top-level `flow` for the end-to-end path instead of only producing separate domain-local flows.
+10. For that journey flow, create boundary-oriented steps that describe the handoff points between services and link those steps back to the domain-local flows with `related` edges.
 
 ## Suggested Top-Level Shape
 

@@ -82,6 +82,8 @@ Produce or update the top-level project knowledge artifacts for the target repo:
 - Follow the promotion rules in `references/merge-policy.md`.
 - Use the canonical naming map in `references/ontology.md`.
 - If no canonical rule can be inferred, mark the item as unresolved rather than guessing.
+- When a clear cross-domain journey exists across multiple services, synthesize a top-level journey flow that stitches the boundary steps together instead of only adding separate domain-local flows.
+- Prefer a journey flow when the path crosses service boundaries in a stable business sequence such as request intake -> domain decision -> downstream handoff.
 
 ## Canonical Top-Level Concepts
 

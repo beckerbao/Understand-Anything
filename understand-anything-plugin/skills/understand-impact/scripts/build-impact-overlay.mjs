@@ -15,7 +15,16 @@ if (!existsSync(CORE_DIST)) {
 
 const { validateGraph } = await import(CORE_DIST);
 
-const ALLOWED_EDGE_TYPES = new Set(["calls", "depends_on", "imports", "contains"]);
+const ALLOWED_EDGE_TYPES = new Set([
+  "calls",
+  "depends_on",
+  "imports",
+  "contains",
+  "routes",
+  "serves",
+  "implements",
+  "configures",
+]);
 const FILE_SEED_TYPES = new Set([
   "file",
   "config",
@@ -107,6 +116,42 @@ function loadCallgraphOverlay(projectRoot) {
       }));
   } catch {
     return [];
+  }
+}
+
+function loadEndpointGraphOverlay(projectRoot) {
+  const graphPath = resolve(projectRoot, ".understand-anything/endpoint-graph.json");
+  if (!existsSync(graphPath)) return { nodes: [], edges: [] };
+  try {
+    const raw = JSON.parse(readFileSync(graphPath, "utf-8"));
+    const nodes = Array.isArray(raw?.nodes) ? raw.nodes : [];
+    const edges = Array.isArray(raw?.edges) ? raw.edges : [];
+    return {
+      nodes: nodes.filter(
+        (node) =>
+          node &&
+          typeof node === "object" &&
+          typeof node.id === "string" &&
+          typeof node.type === "string",
+      ),
+      edges: edges
+        .filter(
+          (edge) =>
+            edge &&
+            typeof edge === "object" &&
+            typeof edge.source === "string" &&
+            typeof edge.target === "string" &&
+            typeof edge.type === "string",
+        )
+        .map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          direction: typeof edge.direction === "string" ? edge.direction : "forward",
+        })),
+    };
+  } catch {
+    return { nodes: [], edges: [] };
   }
 }
 
@@ -281,14 +326,23 @@ function main() {
   }
 
   const resolvedGraph = validation.data;
-  const seedNodeIds = resolveSeeds(resolvedGraph, seed, projectRoot);
+  const endpointOverlay = loadEndpointGraphOverlay(projectRoot);
+  const mergedGraph = {
+    ...resolvedGraph,
+    nodes: [
+      ...resolvedGraph.nodes,
+      ...endpointOverlay.nodes.filter((n) => !resolvedGraph.nodes.some((gn) => gn.id === n.id)),
+    ],
+  };
+
+  const seedNodeIds = resolveSeeds(mergedGraph, seed, projectRoot);
   if (seedNodeIds.length === 0) {
     console.error(`No graph nodes matched seed "${seed}"`);
     process.exit(1);
   }
 
   const callgraphEdges = loadCallgraphOverlay(projectRoot);
-  const { forward, reverse } = buildIndexes(resolvedGraph, callgraphEdges);
+  const { forward, reverse } = buildIndexes(mergedGraph, [...callgraphEdges, ...endpointOverlay.edges]);
   const runUpstream = direction === "upstream" || direction === "both";
   const runDownstream = direction === "downstream" || direction === "both";
 
@@ -365,17 +419,17 @@ function main() {
     kind: "impact",
     generatedAt: new Date().toISOString(),
     project: {
-      name: resolvedGraph.project.name,
-      gitCommitHash: resolvedGraph.project.gitCommitHash,
+      name: mergedGraph.project.name,
+      gitCommitHash: mergedGraph.project.gitCommitHash,
     },
     baseGraph: {
-      kind: resolvedGraph.kind ?? "codebase",
-      gitCommitHash: resolvedGraph.project.gitCommitHash,
+      kind: mergedGraph.kind ?? "codebase",
+      gitCommitHash: mergedGraph.project.gitCommitHash,
     },
     scope: {
       seedNodeIds: seedNodeIds.slice().sort((a, b) => a.localeCompare(b)),
       seedFilePaths: seedNodeIds
-        .map((id) => resolvedGraph.nodes.find((node) => node.id === id)?.filePath)
+        .map((id) => mergedGraph.nodes.find((node) => node.id === id)?.filePath)
         .filter((value) => typeof value === "string"),
       maxHops,
       direction,
@@ -395,7 +449,7 @@ function main() {
     },
     paths,
     layers: {
-      affectedLayerIds: affectedLayers(resolvedGraph, impactNodeIds),
+      affectedLayerIds: affectedLayers(mergedGraph, impactNodeIds),
     },
     stats: {
       seedCount: seedNodeIds.length,
@@ -411,6 +465,7 @@ function main() {
       "impactNodeIds is the computed closure",
       "paths are deterministic shortest paths from the seed to impacted nodes",
       "impactEdgeRefs preserve the original graph edge orientation",
+      "when endpoint-graph.json is present, API mapping edges are included in traversal",
     ],
   };
 

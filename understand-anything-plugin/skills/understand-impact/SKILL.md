@@ -13,6 +13,7 @@ This skill is intentionally scoped to a structural knowledge graph:
 - It requires `.understand-anything/knowledge-graph.json`
 - It assumes the graph is already `kind: "codebase"`
 - It computes impact from existing `calls`, `depends_on`, `imports`, and `contains` edges
+- If present, it also includes API mapping edges from `.understand-anything/endpoint-graph.json` (`routes`, `serves`, `implements`, `configures`)
 - If present, it may also read a separate `callgraph-overlay.json` containing internal
   `function -> function` call edges for deeper multi-hop impact traversal
 - The optional callgraph overlay is produced by `scripts/build-callgraph-overlay.mjs`
@@ -44,6 +45,7 @@ This skill is intentionally scoped to a structural knowledge graph:
    - `depends_on`
    - `imports`
    - `contains`
+   - optionally endpoint mapping edges (`routes`, `serves`, `implements`, `configures`)
    - optionally merge in internal function-call edges from `callgraph-overlay.json`
 5. Traverse according to the requested direction:
    - `downstream` = what the seed depends on

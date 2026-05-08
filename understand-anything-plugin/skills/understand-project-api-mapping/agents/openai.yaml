@@ -1,0 +1,5 @@
+interface:
+  display_name: "Understand Project API Mapping"
+  short_description: "Map endpoints across leaf repos into a project-level API topology graph"
+  default_prompt: "Build a project-level endpoint mapping graph from existing leaf graphs, preserving evidence and confidence for each mapping."
+

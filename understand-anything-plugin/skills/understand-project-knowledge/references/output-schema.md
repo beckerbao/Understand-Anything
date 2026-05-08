@@ -37,6 +37,12 @@ Use a small canonical set:
 - `concept` nodes for governance, ownership, source-of-truth, and boundary rules
 - `config` nodes only when a top-level config file is part of the project governance layer
 
+For cross-domain journeys, add one canonical top-level flow node that stitches multiple service boundaries together, such as:
+
+- `flow:order-to-shipping-request-path`
+
+Use a journey flow when the path crosses services in a stable sequence and you want the dashboard to show the business path, not just isolated domain-local flows.
+
 ## Suggested Edge Set
 
 Use only schema-valid edge types:
@@ -56,6 +62,15 @@ Top-level federation may add a synthetic layer to keep canonical project nodes v
 - `layer:project-federation`
 
 Use it for project-wide domains, flows, steps, concepts, and top-level docs that were promoted from leaf graphs.
+
+## Suggested Journey Flow Shape
+
+When you synthesize a cross-domain journey, prefer this structure:
+
+- one `flow` node with a business path name
+- ordered `step` nodes for boundary transitions
+- `cross_domain` or `depends_on` edges from governance concepts to the domains involved
+- `related` edges from boundary steps back to the underlying domain-local flows
 
 ## Minimal Example
 

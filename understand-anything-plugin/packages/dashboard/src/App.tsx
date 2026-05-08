@@ -4,6 +4,7 @@ import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
+import EndpointGraphView from "./components/EndpointGraphView";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
 import SearchBar from "./components/SearchBar";
 import NodeInfo from "./components/NodeInfo";
@@ -46,6 +47,7 @@ function dataUrl(fileName: string, token: string | null): string {
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "impact-overlay.json": import.meta.env.VITE_IMPACT_OVERLAY_URL,
+      "endpoint-graph.json": import.meta.env.VITE_ENDPOINT_GRAPH_URL,
     };
     const url = envMap[fileName];
     if (url) return url;
@@ -122,6 +124,8 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const isKnowledgeGraph = useDashboardStore((s) => s.isKnowledgeGraph);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
   const setDomainGraph = useDashboardStore((s) => s.setDomainGraph);
+  const endpointGraph = useDashboardStore((s) => s.endpointGraph);
+  const setEndpointGraph = useDashboardStore((s) => s.setEndpointGraph);
   const layoutIssues = useDashboardStore((s) => s.layoutIssues);
   const isMobile = useIsMobile();
   // Schema issues + ELK layout issues share the WarningBanner — graph-load
@@ -388,6 +392,26 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       });
   }, [setDomainGraph]);
 
+  useEffect(() => {
+    fetch(dataUrl("endpoint-graph.json", accessToken))
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data: unknown) => {
+        if (!data) return;
+        const result = validateGraph(data);
+        if (result.success && result.data) {
+          setEndpointGraph(result.data);
+        } else if (result.fatal) {
+          console.warn(`[endpoint-graph] validation failed: ${result.fatal}`);
+        }
+      })
+      .catch(() => {
+        // Silently ignore — endpoint graph is optional
+      });
+  }, [setEndpointGraph]);
+
   // Determine sidebar content
   // NodeInfo always takes priority when a node is selected.
   // Learn mode adds LearnPanel below it; otherwise ProjectOverview shows when idle.
@@ -455,22 +479,38 @@ function Dashboard({ accessToken }: { accessToken: string }) {
           </h1>
           <div className="w-px h-5 bg-border-subtle hidden sm:block" />
           <PersonaSelector />
-          {graph && !isKnowledgeGraph && domainGraph && (
+          {graph && !isKnowledgeGraph && (domainGraph || endpointGraph) && (
             <>
               <div className="w-px h-5 bg-border-subtle" />
               <div className="flex items-center bg-elevated rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("domain")}
-                  title="Switch to domain view"
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    viewMode === "domain"
-                      ? "bg-accent/20 text-accent"
-                      : "text-text-muted hover:text-text-secondary"
-                  }`}
-                >
-                  Domain
-                </button>
+                {domainGraph && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("domain")}
+                    title="Switch to domain view"
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "domain"
+                        ? "bg-accent/20 text-accent"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    Domain
+                  </button>
+                )}
+                {endpointGraph && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("endpoint")}
+                    title="Switch to endpoint view"
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "endpoint"
+                        ? "bg-accent/20 text-accent"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    Endpoint
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setViewMode("structural")}
@@ -600,6 +640,8 @@ function Dashboard({ accessToken }: { accessToken: string }) {
             <KnowledgeGraphView />
           ) : viewMode === "domain" && domainGraph ? (
             <DomainGraphView />
+          ) : viewMode === "endpoint" && endpointGraph ? (
+            <EndpointGraphView />
           ) : (
             <GraphView />
           )}

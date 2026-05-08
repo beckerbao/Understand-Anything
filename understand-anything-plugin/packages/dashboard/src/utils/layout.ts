@@ -188,6 +188,43 @@ export function applyForceLayout(
   return { nodes: layoutedNodes, edges };
 }
 
+/**
+ * Cheap deterministic grid layout for large flat graphs.
+ *
+ * This is intentionally O(n) and avoids force simulation entirely. It is
+ * used as the overview fallback when a codebase has no explicit layers and
+ * rendering the entire structural graph as one force layout would be too
+ * expensive to initialize.
+ */
+export function applyGridLayout(
+  nodes: Node[],
+  edges: Edge[],
+  nodeDimensions?: Map<string, { width: number; height: number }>,
+  columns?: number,
+  spacingX = 80,
+  spacingY = 60,
+): { nodes: Node[]; edges: Edge[] } {
+  if (nodes.length === 0) return { nodes, edges };
+
+  const cols = Math.max(1, columns ?? Math.ceil(Math.sqrt(nodes.length)));
+  const layoutedNodes = nodes.map((node, index) => {
+    const row = Math.floor(index / cols);
+    const col = index % cols;
+    const dims = nodeDimensions?.get(node.id);
+    const w = dims?.width ?? NODE_WIDTH;
+    const h = dims?.height ?? NODE_HEIGHT;
+    return {
+      ...node,
+      position: {
+        x: col * (w + spacingX),
+        y: row * (h + spacingY),
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+}
+
 // ---------------------------------------------------------------------------
 // ELK helpers
 // ---------------------------------------------------------------------------

@@ -240,6 +240,162 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
             merged_ids.update(synthetic_node_ids)
             existing["nodeIds"] = list(merged_ids)
 
+    # Synthetic cross-domain journey: order -> shipping -> interface.
+    # This is intentionally conservative and only activates when the three
+    # canonical domains exist together in the merged graph.
+    order_id = "domain:order" if "domain:order" in node_ids else None
+    shipping_id = "domain:shipping" if "domain:shipping" in node_ids else None
+    interface_id = "domain:interface" if "domain:interface" in node_ids else None
+    journey_flow_id = "flow:order-to-shipping-request-path"
+    if order_id and shipping_id and interface_id:
+        journey_nodes = [
+            {
+                "id": journey_flow_id,
+                "type": "flow",
+                "name": "Order To Shipping Request Path",
+                "summary": "Canonical end-to-end journey from request intake through order handling, shipping handoff, and downstream orchestration across the interface layer.",
+                "tags": ["flow", "journey", "order", "shipping", "interface"],
+                "complexity": "moderate",
+            },
+            {
+                "id": "step:order-to-shipping-request-path:authenticate-request",
+                "type": "step",
+                "name": "Authenticate Request",
+                "summary": "Authenticate and validate the inbound request before entering the order path.",
+                "tags": ["step", "interface", "order"],
+                "complexity": "simple",
+            },
+            {
+                "id": "step:order-to-shipping-request-path:validate-order",
+                "type": "step",
+                "name": "Validate Order",
+                "summary": "Validate order rules and confirm the order can proceed to shipment.",
+                "tags": ["step", "order"],
+                "complexity": "simple",
+            },
+            {
+                "id": "step:order-to-shipping-request-path:handoff-to-shipping",
+                "type": "step",
+                "name": "Handoff To Shipping",
+                "summary": "Transfer the accepted order into the shipping domain boundary.",
+                "tags": ["step", "order", "shipping"],
+                "complexity": "simple",
+            },
+            {
+                "id": "step:order-to-shipping-request-path:create-shipment",
+                "type": "step",
+                "name": "Create Shipment",
+                "summary": "Create the shipment record and downstream logistics state.",
+                "tags": ["step", "shipping"],
+                "complexity": "simple",
+            },
+        ]
+        for node in journey_nodes:
+            nodes_by_id[node["id"]] = node
+
+        journey_edges = [
+            {
+                "source": "domain:interface",
+                "target": journey_flow_id,
+                "type": "contains_flow",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": journey_flow_id,
+                "target": "step:order-to-shipping-request-path:authenticate-request",
+                "type": "flow_step",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": journey_flow_id,
+                "target": "step:order-to-shipping-request-path:validate-order",
+                "type": "flow_step",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": journey_flow_id,
+                "target": "step:order-to-shipping-request-path:handoff-to-shipping",
+                "type": "flow_step",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": journey_flow_id,
+                "target": "step:order-to-shipping-request-path:create-shipment",
+                "type": "flow_step",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": "step:order-to-shipping-request-path:authenticate-request",
+                "target": "concept:interface-contract-governance",
+                "type": "related",
+                "direction": "forward",
+                "weight": 0.9,
+            },
+            {
+                "source": "step:order-to-shipping-request-path:validate-order",
+                "target": "domain:order",
+                "type": "related",
+                "direction": "forward",
+                "weight": 0.9,
+            },
+            {
+                "source": "step:order-to-shipping-request-path:handoff-to-shipping",
+                "target": "concept:shipping-handoff-governance",
+                "type": "related",
+                "direction": "forward",
+                "weight": 0.95,
+            },
+            {
+                "source": "step:order-to-shipping-request-path:create-shipment",
+                "target": "domain:shipping",
+                "type": "related",
+                "direction": "forward",
+                "weight": 0.9,
+            },
+            {
+                "source": "concept:interface-contract-governance",
+                "target": "domain:interface",
+                "type": "cross_domain",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": "concept:shipping-handoff-governance",
+                "target": "domain:shipping",
+                "type": "cross_domain",
+                "direction": "forward",
+                "weight": 1.0,
+            },
+            {
+                "source": "concept:shipping-handoff-governance",
+                "target": "domain:order",
+                "type": "depends_on",
+                "direction": "forward",
+                "weight": 0.9,
+            },
+        ]
+        for edge in journey_edges:
+            key = (edge["source"], edge["target"], edge["type"])
+            if key not in edges_by_key and edge["source"] in nodes_by_id and edge["target"] in nodes_by_id:
+                edges_by_key[key] = edge
+        synthetic_layer = layers_by_id.get(synthetic_layer_id)
+        if synthetic_layer is not None:
+            ids = set(synthetic_layer.get("nodeIds", []))
+            ids.update(node["id"] for node in journey_nodes)
+            synthetic_layer["nodeIds"] = list(ids)
+        else:
+            layers_by_id[synthetic_layer_id] = {
+                "id": synthetic_layer_id,
+                "name": "Project Federation",
+                "description": "Canonical top-level domains, flows, steps, concepts, and project docs federated from leaf graphs.",
+                "nodeIds": [node["id"] for node in journey_nodes],
+            }
+
     all_tour_steps: list[dict] = []
     title_to_step: dict[str, dict] = {}
     for g in graphs:

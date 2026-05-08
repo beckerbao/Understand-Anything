@@ -38,6 +38,7 @@ import {
   LAYER_CLUSTER_HEIGHT,
   PORTAL_NODE_WIDTH,
   PORTAL_NODE_HEIGHT,
+  applyGridLayout,
   ELK_DEFAULT_LAYOUT_OPTIONS,
   nodesToElkInput,
   mergeElkPositions,
@@ -213,7 +214,17 @@ function useOverviewGraph() {
   const nodesById = useDashboardStore((s) => s.nodesById);
   const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
   const searchResults = useDashboardStore((s) => s.searchResults);
+  const persona = useDashboardStore((s) => s.persona);
+  const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
+  const selectNode = useDashboardStore((s) => s.selectNode);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
+
+  const handleNodeSelect = useCallback(
+    (nodeId: string) => {
+      selectNode(nodeId);
+    },
+    [selectNode],
+  );
 
   // Build cluster nodes / flow edges / dims synchronously; only the layout
   // call itself is async, so we memo the structural pieces and run ELK in an
@@ -224,7 +235,79 @@ function useOverviewGraph() {
     }
     const layers = graph.layers ?? [];
     if (layers.length === 0) {
-      return null;
+      const subFileTypes = new Set(["function", "class"]);
+      const allVisibleTypes = new Set([
+        "file", "module", "concept",
+        "config", "document", "service", "table",
+        "endpoint", "pipeline", "schema", "resource",
+        "domain", "flow", "step",
+        "function", "class",
+      ]);
+
+      let filteredGraphNodes = graph.nodes.filter((n) => {
+        if (!allVisibleTypes.has(n.type)) return false;
+        if (persona === "non-technical" && subFileTypes.has(n.type)) return false;
+        return true;
+      });
+
+      filteredGraphNodes = filteredGraphNodes.filter((n) => {
+        const category = NODE_TYPE_TO_CATEGORY[n.type as NodeType];
+        const effectiveCategory = category ?? "code";
+        return nodeTypeFilters[effectiveCategory] !== false;
+      });
+
+      const filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
+      const filteredGraphEdges = graph.edges.filter(
+        (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
+      );
+
+      const sortedGraphNodes = [...filteredGraphNodes].sort((a, b) => {
+        const typeOrder = [
+          "file", "function", "class", "module", "config", "document",
+          "service", "table", "endpoint", "pipeline", "schema", "resource",
+          "concept", "domain", "flow", "step",
+        ];
+        const aType = typeOrder.indexOf(a.type);
+        const bType = typeOrder.indexOf(b.type);
+        if (aType !== bType) return (aType === -1 ? 999 : aType) - (bType === -1 ? 999 : bType);
+        return (a.name ?? a.id).localeCompare(b.name ?? b.id);
+      });
+
+      const flatNodes = sortedGraphNodes.map((node) =>
+        buildCustomFlowNode(node, {
+          diffMode: false,
+          changedNodeIds: new Set<string>(),
+          affectedNodeIds: new Set<string>(),
+          impactMode: false,
+          impactSeedNodeIds: new Set<string>(),
+          impactUpstreamNodeIds: new Set<string>(),
+          impactDownstreamNodeIds: new Set<string>(),
+          impactNodeIds: new Set<string>(),
+          onNodeClick: handleNodeSelect,
+        }),
+      );
+      const dims = new Map(flatNodes.map((n) => [n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }]));
+      const { nodes: positionedNodes, edges: positionedEdges } = applyGridLayout(
+        flatNodes,
+        filteredGraphEdges.map((edge) => ({
+          id: `${edge.source}|${edge.target}|${edge.type}`,
+          source: edge.source,
+          target: edge.target,
+        })) as Edge[],
+        dims,
+        6,
+        40,
+        28,
+      );
+
+      return {
+        clusterNodes: positionedNodes,
+        flowEdges: positionedEdges,
+        dims,
+        nodeToContainer: new Map<string, string>(),
+        containerIds: [],
+        layoutStatus: "ready" as const,
+      };
     }
 
     // Build search match counts per layer using the precomputed
@@ -1531,7 +1614,11 @@ function GraphViewInner() {
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: { id: string }) => {
       if (navigationLevel === "overview") {
-        drillIntoLayer(node.id);
+        if ((graph?.layers?.length ?? 0) > 0) {
+          drillIntoLayer(node.id);
+        } else {
+          selectNode(node.id);
+        }
       } else if (node.id.startsWith("portal:")) {
         const targetLayerId = node.id.replace("portal:", "");
         drillIntoLayer(targetLayerId);
@@ -1539,7 +1626,7 @@ function GraphViewInner() {
         selectNode(node.id);
       }
     },
-    [navigationLevel, drillIntoLayer, selectNode],
+    [navigationLevel, graph?.layers?.length, drillIntoLayer, selectNode],
   );
 
   const onPaneClick = useCallback(() => {

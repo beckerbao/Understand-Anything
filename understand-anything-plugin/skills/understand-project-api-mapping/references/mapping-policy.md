@@ -1,0 +1,49 @@
+# Mapping Policy
+
+## Goal
+
+Map endpoint-to-endpoint relationships across leaf repos with explicit evidence.
+
+## Preconditions
+
+Each leaf repo must already have at least one:
+
+- `.understand-anything/domain-graph.json`
+- `.understand-anything/knowledge-graph.json`
+
+If both are missing, fail and report the leaf path.
+
+## Endpoint Signature
+
+Canonical signature:
+
+- `method` uppercase
+- `canonicalPath` normalized path template
+
+Path normalization rules:
+
+1. Trim query strings.
+2. Collapse duplicate slashes.
+3. Convert path params to `{id}` shape.
+4. Remove trailing slash except root.
+
+## Mapping Priority
+
+1. Exact match on `method + canonicalPath` and gateway backend hint.
+2. Exact path match with compatible method.
+3. Prefix match with strong backend evidence.
+4. Otherwise mark unresolved.
+
+## Confidence
+
+- `high`: exact signature match + backend evidence.
+- `medium`: method/path match without strong backend evidence.
+- `low`: heuristic-only candidate (must not become a `routes` edge automatically).
+
+## Output Rules
+
+1. Only `high` and `medium` candidates can produce `routes` edges.
+2. `low` candidates become unresolved `concept` nodes with `related` links.
+3. Always preserve evidence in endpoint node metadata.
+4. Never fabricate downstream endpoints that do not exist in leaf graphs.
+

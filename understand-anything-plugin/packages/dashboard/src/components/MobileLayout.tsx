@@ -3,6 +3,7 @@ import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "../store";
 import GraphView from "./GraphView";
 import DomainGraphView from "./DomainGraphView";
+import EndpointGraphView from "./EndpointGraphView";
 import KnowledgeGraphView from "./KnowledgeGraphView";
 import SearchBar from "./SearchBar";
 import NodeInfo from "./NodeInfo";
@@ -41,6 +42,7 @@ export default function MobileLayout({
   const persona = useDashboardStore((s) => s.persona);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const endpointGraph = useDashboardStore((s) => s.endpointGraph);
   const codeViewerOpen = useDashboardStore((s) => s.codeViewerOpen);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
@@ -154,6 +156,8 @@ export default function MobileLayout({
             <KnowledgeGraphView />
           ) : viewMode === "domain" && domainGraph ? (
             <DomainGraphView />
+          ) : viewMode === "endpoint" && endpointGraph ? (
+            <EndpointGraphView />
           ) : (
             <GraphView />
           )}
