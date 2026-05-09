@@ -19,6 +19,13 @@ import type { GraphEdge, GraphNode } from "@understand-anything/core/types";
 
 const nodeTypes = { custom: CustomNode };
 
+function normalizedProjectPath(path: string): string {
+  const p = (path || "").trim();
+  if (!p) return p;
+  const m = p.match(/^\/(order|stock|interface)(\/.*)$/);
+  return m ? m[2] : p;
+}
+
 function toCustomNode(
   node: GraphNode,
   onClick: (id: string) => void,
@@ -86,6 +93,14 @@ function EndpointGraphViewInner() {
     const nodeById = new Map(endpointGraph.nodes.map((n) => [n.id, n]));
     const edges = endpointGraph.edges;
 
+    const isEndpointVisibleDefault = (node: GraphNode): boolean => {
+      if (node.type !== "endpoint") return true;
+      const meta = (node.domainMeta ?? {}) as Record<string, unknown>;
+      const connected = meta.crossServiceConnected;
+      const hidden = meta.hiddenByDefault;
+      return connected === true && hidden !== true;
+    };
+
     const onNodeClick = (id: string) => {
       const node = nodeById.get(id);
       if (!node) return;
@@ -117,7 +132,10 @@ function EndpointGraphViewInner() {
       const servedEndpointIds = new Set<string>();
       for (const edge of edges) {
         if (edge.type === "serves" && edge.source === activeServiceId) {
-          servedEndpointIds.add(edge.target);
+          const endpointNode = nodeById.get(edge.target);
+          if (endpointNode && isEndpointVisibleDefault(endpointNode)) {
+            servedEndpointIds.add(edge.target);
+          }
           visibleEdges.push(edge);
         }
       }
@@ -128,6 +146,8 @@ function EndpointGraphViewInner() {
         if (!endpointNode) continue;
         visibleNodes.set(endpointId, endpointNode);
         highlightNodeIds.add(endpointId);
+        const endpointMeta = (endpointNode.domainMeta ?? {}) as Record<string, unknown>;
+        const endpointCanonical = normalizedProjectPath(String(endpointMeta.canonicalPath ?? endpointMeta.path ?? ""));
 
         for (const edge of edges) {
           if (edge.source !== endpointId && edge.target !== endpointId) continue;
@@ -143,6 +163,16 @@ function EndpointGraphViewInner() {
             edge.type === "configures" ||
             otherNode.type === "service"
           ) {
+            // Avoid duplicate visual endpoints when gateway-prefixed and backend
+            // endpoints represent the same canonical business path.
+            if (otherNode.type === "endpoint") {
+              const otherMeta = (otherNode.domainMeta ?? {}) as Record<string, unknown>;
+              const otherCanonical = normalizedProjectPath(String(otherMeta.canonicalPath ?? otherMeta.path ?? ""));
+              const otherHidden = otherMeta.hiddenByDefault === true;
+              if (otherHidden && endpointCanonical && otherCanonical && endpointCanonical === otherCanonical) {
+                continue;
+              }
+            }
             visibleEdges.push(edge);
             visibleNodes.set(otherNode.id, otherNode);
             highlightNodeIds.add(otherNode.id);

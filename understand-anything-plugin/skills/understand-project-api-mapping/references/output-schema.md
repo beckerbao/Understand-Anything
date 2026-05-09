@@ -48,6 +48,8 @@ Endpoint nodes should include `domainMeta` when available:
   "auth": "api-key|bearer|none|unknown",
   "rateLimit": "string or empty",
   "confidence": "high|medium|low",
+  "crossServiceConnected": true,
+  "hiddenByDefault": false,
   "evidence": [
     {
       "sourceRepo": "/abs/path/to/repo",
@@ -66,3 +68,5 @@ Endpoint nodes should include `domainMeta` when available:
 3. `routes` edges should carry `weight` between `0.0` and `1.0`.
 4. `endpoint` nodes should include `method` and `path` in `domainMeta` if known.
 5. Unresolved mappings stay at endpoint metadata level (`confidence: low`) and must not create `routes`.
+6. `crossServiceConnected` should be `true` only when there is at least one cross-service connector.
+7. Gateway endpoints should default `hiddenByDefault=true` for project-level dashboard views.

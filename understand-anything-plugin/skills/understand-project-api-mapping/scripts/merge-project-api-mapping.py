@@ -21,6 +21,8 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def endpoint_node(ep: dict[str, Any]) -> dict[str, Any]:
+    service_name = ep.get("service", "")
+    is_gateway = "gateway" in str(service_name)
     return {
         "id": ep["id"],
         "type": "endpoint",
@@ -36,6 +38,8 @@ def endpoint_node(ep: dict[str, Any]) -> dict[str, Any]:
             "auth": "unknown",
             "rateLimit": "",
             "confidence": "medium",
+            "crossServiceConnected": False,
+            "hiddenByDefault": is_gateway,
             "evidence": [
                 {
                     "sourceRepo": ep.get("service", ""),
@@ -156,6 +160,30 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
             "weight": 0.7,
         }
         edges_by_key[(dep_edge["source"], dep_edge["target"], dep_edge["type"])] = dep_edge
+
+    # Mark endpoint connectivity metadata from built connector edges.
+    endpoint_connected_ids: set[str] = set()
+    for edge in edges_by_key.values():
+        et = edge.get("type")
+        src = str(edge.get("source", ""))
+        tgt = str(edge.get("target", ""))
+        if et == "routes":
+            if src.startswith("endpoint:"):
+                endpoint_connected_ids.add(src)
+            if tgt.startswith("endpoint:"):
+                endpoint_connected_ids.add(tgt)
+        elif et == "depends_on":
+            # endpoint -> service fallback connectivity
+            if src.startswith("endpoint:"):
+                endpoint_connected_ids.add(src)
+
+    for node in nodes_by_id.values():
+        if node.get("type") != "endpoint":
+            continue
+        dm = node.get("domainMeta")
+        if not isinstance(dm, dict):
+            continue
+        dm["crossServiceConnected"] = node["id"] in endpoint_connected_ids
 
     now = datetime.now(timezone.utc).isoformat()
     graph = {

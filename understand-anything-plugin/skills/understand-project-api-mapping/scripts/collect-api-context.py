@@ -27,6 +27,11 @@ def find_graph_file(repo_root: Path) -> Path | None:
     return None
 
 
+def graph_files(repo_root: Path) -> list[Path]:
+    ua_dir = repo_root / ".understand-anything"
+    return [p for p in (ua_dir / "domain-graph.json", ua_dir / "knowledge-graph.json") if p.exists()]
+
+
 def normalize_path(path: str) -> str:
     p = path.strip()
     if "?" in p:
@@ -45,7 +50,10 @@ def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[
 
     for node in nodes:
         node_type = str(node.get("type", "")).strip()
-        if node_type not in {"endpoint", "flow"}:
+        # Strict: only endpoint nodes are accepted as real HTTP endpoint candidates.
+        # flow nodes are business/process abstractions and must not be converted
+        # into endpoint paths.
+        if node_type != "endpoint":
             continue
         meta = node.get("domainMeta", {}) if isinstance(node.get("domainMeta"), dict) else {}
         entry_point = str(meta.get("entryPoint", "")).strip()
@@ -60,10 +68,21 @@ def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[
             else:
                 path = entry_point
 
-        if not path and node_type == "endpoint":
+        if not path:
             path = str(node.get("name", "")).strip()
+            # Many leaf endpoint nodes encode HTTP signature in the node name,
+            # e.g. "GET /api/v1/orders". Recover method/path from that form.
+            m_name = re.match(r"^\s*([A-Z]+)\s+(.+)$", path)
+            if m_name:
+                method = m_name.group(1).upper()
+                path = m_name.group(2).strip()
 
         if not path:
+            continue
+        # HTTP-only filter: require explicit method/path from entryPoint OR
+        # endpoint name that starts with METHOD + path.
+        looks_like_http = bool(re.match(r"^\s*(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+/", f"{method} {path}", re.IGNORECASE))
+        if not looks_like_http and entry_type.lower() != "http":
             continue
 
         endpoint_id = f"endpoint:{repo_root.name}:{method}:{normalize_path(path)}"
@@ -104,19 +123,39 @@ def main() -> None:
         if not leaf.is_dir():
             missing.append(f"{leaf} (missing directory)")
             continue
-        graph_file = find_graph_file(leaf)
-        if graph_file is None:
+        files = graph_files(leaf)
+        if not files:
             missing.append(f"{leaf} (missing .understand-anything/domain-graph.json or knowledge-graph.json)")
             continue
-        graph = load_json(graph_file)
-        endpoints = extract_endpoint_nodes(graph, leaf)
+
+        endpoints: list[dict[str, Any]] = []
+        loaded_graphs: list[Path] = []
+        for graph_file in files:
+            graph = load_json(graph_file)
+            loaded_graphs.append(graph_file)
+            endpoints.extend(extract_endpoint_nodes(graph, leaf))
+
+        # Deduplicate endpoint ids across domain/knowledge sources.
+        dedup: dict[str, dict[str, Any]] = {}
+        for ep in endpoints:
+            dedup[ep["id"]] = ep
+        endpoints = sorted(dedup.values(), key=lambda e: e["id"])
+
+        warning = None
+        if not endpoints:
+            warning = (
+                "No HTTP endpoints detected from existing leaf graphs. "
+                "Agent must read leaf graph semantics directly and keep unresolved; "
+                "do not infer from flow/file paths."
+            )
+
         leaves_payload.append(
             {
                 "repoRoot": str(leaf),
                 "repoName": leaf.name,
-                "graphPath": str(graph_file),
-                "project": graph.get("project", {}),
+                "graphPaths": [str(p) for p in loaded_graphs],
                 "endpoints": endpoints,
+                **({"warning": warning} if warning else {}),
             }
         )
 
@@ -137,4 +176,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

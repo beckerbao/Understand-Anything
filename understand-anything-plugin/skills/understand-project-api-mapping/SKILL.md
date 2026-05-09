@@ -23,6 +23,8 @@ Scope is strictly project API topology:
 
 - `service` and `endpoint` nodes only
 - no function-level or file-level modeling
+- default view target is cross-service connected endpoints only
+- gateway endpoints are retained in data but should be hidden by default in UI
 
 ## Inputs
 
@@ -44,6 +46,12 @@ This skill does not run `/understand` for leaf repos.
 4. Score mappings with confidence (`high`, `medium`, `low`).
 5. Keep only evidence-backed mappings; mark uncertain ones unresolved.
 6. Merge and validate final `endpoint-graph.json`.
+7. Mark endpoint visibility metadata:
+   - `crossServiceConnected=true` when endpoint has cross-service connector evidence
+   - `hiddenByDefault=true` for gateway endpoints unless explicitly requested
+
+If a leaf has no detected HTTP endpoint candidates, do not run any extra leaf tool.
+Agent must read existing leaf graph semantics directly and keep unresolved when evidence is insufficient.
 
 ## Execution Files
 

@@ -29,3 +29,6 @@ Write a valid `endpoint-graph.json` using:
 3. Keep uncertain candidates as unresolved endpoint metadata (`confidence: low`); do not create `routes` edges.
 4. Preserve evidence in `domainMeta.evidence` for endpoint nodes.
 5. Never create a downstream endpoint that does not exist in input.
+6. If a leaf lacks explicit HTTP endpoints, reason from existing graph semantics only; do not invoke extra tooling and do not derive endpoints from file/module paths.
+7. Prefer cross-service connected endpoints in output semantics. Endpoints with no cross-service connector should be marked unconnected in metadata.
+8. For gateway endpoints, retain them in data model but mark hidden-by-default metadata so UI can suppress noise in project view.
