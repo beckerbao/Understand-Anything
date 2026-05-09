@@ -44,6 +44,35 @@ def normalize_path(path: str) -> str:
     return p or "/"
 
 
+def unique_keep_order(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for v in values:
+        s = v.strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def infer_business_actions(text: str) -> list[str]:
+    low = text.lower()
+    actions: list[str] = []
+    mapping = [
+        ("create_order", ["create", "new order", "order/create", "order-request"]),
+        ("update_order_status", ["status", "state", "update-status", "transition"]),
+        ("print_waybill", ["waybill", "print-waybill", "awb"]),
+        ("request_shipping_quote", ["quotation", "quote", "delivery/quotes"]),
+        ("sync_activity_log", ["activity", "audit", "timeline", "log"]),
+        ("reserve_stock", ["reservation", "reserve", "stock/hold"]),
+    ]
+    for action, keys in mapping:
+        if any(k in low for k in keys):
+            actions.append(action)
+    return unique_keep_order(actions)
+
+
 def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[str, Any]]:
     nodes = [n for n in graph.get("nodes", []) if isinstance(n, dict)]
     endpoints: list[dict[str, Any]] = []
@@ -86,6 +115,14 @@ def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[
             continue
 
         endpoint_id = f"endpoint:{repo_root.name}:{method}:{normalize_path(path)}"
+        meta = node.get("meta", {}) if isinstance(node.get("meta"), dict) else {}
+        endpoint_actions = unique_keep_order(
+            [
+                *(meta.get("business_actions", []) if isinstance(meta.get("business_actions"), list) else []),
+                *(meta.get("use_cases", []) if isinstance(meta.get("use_cases"), list) else []),
+                *infer_business_actions(f"{node.get('name', '')} {node.get('summary', '')} {path}"),
+            ]
+        )
         endpoints.append(
             {
                 "id": endpoint_id,
@@ -99,9 +136,69 @@ def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[
                 "summary": str(node.get("summary", "")).strip(),
                 "tags": node.get("tags", []),
                 "filePath": node.get("filePath"),
+                "businessActions": endpoint_actions,
             }
         )
     return endpoints
+
+
+def extract_callouts(graph: dict[str, Any], repo_root: Path) -> list[dict[str, Any]]:
+    nodes = [n for n in graph.get("nodes", []) if isinstance(n, dict)]
+    edges = [e for e in graph.get("edges", []) if isinstance(e, dict)]
+    endpoint_to_functions: dict[str, set[str]] = {}
+    function_to_callouts: dict[str, set[str]] = {}
+    for edge in edges:
+        src = str(edge.get("source", "")).strip()
+        tgt = str(edge.get("target", "")).strip()
+        if src.startswith("endpoint:") and tgt.startswith("function:"):
+            endpoint_to_functions.setdefault(src, set()).add(tgt)
+        if src.startswith("function:") and tgt.startswith("callout:"):
+            function_to_callouts.setdefault(tgt, set()).add(src)
+
+    out: list[dict[str, Any]] = []
+    for node in nodes:
+        node_type = str(node.get("type", "")).strip()
+        node_id = str(node.get("id", "")).strip()
+        # Backward compatible:
+        # - legacy leaf graphs: type == callout
+        # - normalized leaf graphs: type == endpoint with id prefix callout:
+        if node_type != "callout" and not (node_type == "endpoint" and node_id.startswith("callout:")):
+            continue
+        meta = node.get("meta", {}) if isinstance(node.get("meta"), dict) else {}
+        method = "UNKNOWN"
+        path = str(meta.get("target_path", "")).strip()
+        name = str(node.get("name", "")).strip()
+        m = re.match(r"^\s*([A-Z]+)\s+(.+)$", name)
+        if m:
+            method = m.group(1).upper()
+            if not path:
+                path = m.group(2).strip()
+        if not path:
+            continue
+        caller_functions = sorted(function_to_callouts.get(node_id, set()))
+        source_endpoint_node_ids: set[str] = set()
+        if caller_functions:
+            for endpoint_node_id, fn_ids in endpoint_to_functions.items():
+                if any(fn in fn_ids for fn in caller_functions):
+                    source_endpoint_node_ids.add(endpoint_node_id)
+
+        out.append(
+            {
+                "id": node_id,
+                "service": repo_root.name,
+                "method": method,
+                "path": path,
+                "canonicalPath": normalize_path(path),
+                "targetBase": str(meta.get("target_base", "")).strip(),
+                "function": str(meta.get("function", "")).strip(),
+                "filePath": node.get("filePath"),
+                "summary": str(node.get("summary", "")).strip(),
+                "businessActions": infer_business_actions(f"{name} {path} {meta.get('function', '')}"),
+                "callerFunctions": caller_functions,
+                "sourceEndpointNodeIds": sorted(source_endpoint_node_ids),
+            }
+        )
+    return out
 
 
 def main() -> None:
@@ -129,11 +226,13 @@ def main() -> None:
             continue
 
         endpoints: list[dict[str, Any]] = []
+        callouts: list[dict[str, Any]] = []
         loaded_graphs: list[Path] = []
         for graph_file in files:
             graph = load_json(graph_file)
             loaded_graphs.append(graph_file)
             endpoints.extend(extract_endpoint_nodes(graph, leaf))
+            callouts.extend(extract_callouts(graph, leaf))
 
         # Deduplicate endpoint ids across domain/knowledge sources.
         dedup: dict[str, dict[str, Any]] = {}
@@ -155,6 +254,7 @@ def main() -> None:
                 "repoName": leaf.name,
                 "graphPaths": [str(p) for p in loaded_graphs],
                 "endpoints": endpoints,
+                "callouts": callouts,
                 **({"warning": warning} if warning else {}),
             }
         )

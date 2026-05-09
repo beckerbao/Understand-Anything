@@ -14,6 +14,7 @@ This skill is intentionally scoped to a structural knowledge graph:
 - It assumes the graph is already `kind: "codebase"`
 - It computes impact from existing `calls`, `depends_on`, `imports`, and `contains` edges
 - If present, it also includes API mapping edges from `.understand-anything/endpoint-graph.json` (`routes`, `serves`, `implements`, `configures`)
+- If endpoint nodes carry `domainMeta.businessActions/useCases`, output also includes business-impact summary (use-case blast radius)
 - If present, it may also read a separate `callgraph-overlay.json` containing internal
   `function -> function` call edges for deeper multi-hop impact traversal
 - The optional callgraph overlay is produced by `scripts/build-callgraph-overlay.mjs`
@@ -28,6 +29,7 @@ This skill is intentionally scoped to a structural knowledge graph:
 - Downstream closure
 - Impact paths
 - Hop counts and summary stats
+- Business impact summary (`businessImpact.impactedBusinessActions`, `businessImpact.impactedEndpoints`)
 
 ## Workflow
 

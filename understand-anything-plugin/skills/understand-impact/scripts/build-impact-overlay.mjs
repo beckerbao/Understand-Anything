@@ -304,6 +304,50 @@ function affectedLayers(graph, nodeIds) {
   );
 }
 
+function collectBusinessImpact(nodesById, impactNodeIds, seedNodeIds) {
+  const actions = new Map();
+  const endpointImpacts = [];
+  const seedSet = new Set(seedNodeIds);
+
+  for (const nodeId of impactNodeIds) {
+    const node = nodesById.get(nodeId);
+    if (!node || node.type !== "endpoint") continue;
+    const dm = node.domainMeta ?? {};
+    const service = typeof dm.service === "string" ? dm.service : "";
+    const method = typeof dm.method === "string" ? dm.method : "";
+    const path = typeof dm.canonicalPath === "string" ? dm.canonicalPath : "";
+    const nodeActions = Array.isArray(dm.businessActions)
+      ? dm.businessActions.filter((v) => typeof v === "string" && v.trim().length > 0)
+      : [];
+
+    if (!seedSet.has(nodeId)) {
+      endpointImpacts.push({
+        nodeId,
+        service,
+        endpoint: `${method} ${path}`.trim(),
+        businessActions: [...new Set(nodeActions)].sort((a, b) => a.localeCompare(b)),
+      });
+    }
+
+    for (const a of nodeActions) {
+      const key = a.trim();
+      if (!key) continue;
+      if (!actions.has(key)) actions.set(key, new Set());
+      if (service) actions.get(key).add(service);
+    }
+  }
+
+  return {
+    impactedBusinessActions: [...actions.entries()]
+      .map(([action, services]) => ({
+        action,
+        services: [...services].sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort((a, b) => a.action.localeCompare(b.action)),
+    impactedEndpoints: endpointImpacts.sort((a, b) => a.nodeId.localeCompare(b.nodeId)),
+  };
+}
+
 function main() {
   const { projectRoot, seed, maxHops, direction } = parseArgs(process.argv);
   if (!projectRoot || !seed) {
@@ -343,6 +387,8 @@ function main() {
 
   const callgraphEdges = loadCallgraphOverlay(projectRoot);
   const { forward, reverse } = buildIndexes(mergedGraph, [...callgraphEdges, ...endpointOverlay.edges]);
+  const nodesById = new Map();
+  for (const n of mergedGraph.nodes) nodesById.set(n.id, n);
   const runUpstream = direction === "upstream" || direction === "both";
   const runDownstream = direction === "downstream" || direction === "both";
 
@@ -461,11 +507,13 @@ function main() {
         ...[...upstream.bestDepth.values(), ...downstream.bestDepth.values()],
       ),
     },
+    businessImpact: collectBusinessImpact(nodesById, impactNodeIds, seedNodeIds),
     notes: [
       "impactNodeIds is the computed closure",
       "paths are deterministic shortest paths from the seed to impacted nodes",
       "impactEdgeRefs preserve the original graph edge orientation",
       "when endpoint-graph.json is present, API mapping edges are included in traversal",
+      "businessImpact summarizes inferred use-case/action blast radius from endpoint metadata",
     ],
   };
 

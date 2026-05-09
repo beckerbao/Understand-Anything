@@ -41,12 +41,20 @@ This skill does not run `/understand` for leaf repos.
 ## Workflow
 
 1. Collect endpoint-centric context from every leaf graph.
+   - Prefer structural evidence chain inside each leaf:
+     `endpoint -> function (calls) -> callout (calls)`.
+   - Persist `sourceEndpointNodeIds` for each outbound callout when this chain is available.
 2. Normalize endpoint signatures (`method + canonical path`).
 3. Build candidate mappings across leaves.
+   - Priority order:
+     1) evidence-backed mapping from `sourceEndpointNodeIds`
+     2) direct `method + canonicalPath` endpoint match
+     3) heuristic keyword fallback (only when evidence is missing)
 4. Score mappings with confidence (`high`, `medium`, `low`).
 5. Keep only evidence-backed mappings; mark uncertain ones unresolved.
 6. Merge and validate final `endpoint-graph.json`.
-7. Mark endpoint visibility metadata:
+7. Propagate `businessActions/useCases` from leaf endpoint/callout semantics into project endpoint nodes for impact analysis.
+8. Mark endpoint visibility metadata:
    - `crossServiceConnected=true` when endpoint has cross-service connector evidence
    - `hiddenByDefault=true` for gateway endpoints unless explicitly requested
 

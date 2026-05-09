@@ -58,6 +58,8 @@ def endpoint_node(ep: dict[str, Any]) -> dict[str, Any]:
             "confidence": "medium",
             "crossServiceConnected": False,
             "hiddenByDefault": is_gateway,
+            "businessActions": ep.get("businessActions", []),
+            "useCases": ep.get("businessActions", []),
             "evidence": [
                 {
                     "sourceRepo": ep.get("service", ""),
@@ -87,12 +89,17 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
 
     leaves = context.get("leaves", [])
     all_eps: list[dict[str, Any]] = []
+    all_callouts: list[dict[str, Any]] = []
     for leaf in leaves:
         service = leaf.get("repoName", "")
         if service:
             nodes_by_id[f"service:{service}"] = service_node(service)
+        is_gateway_service = "gateway" in str(service)
         for ep in leaf.get("endpoints", []):
             all_eps.append(ep)
+            if is_gateway_service:
+                # Keep gateway only at service level for project endpoint view.
+                continue
             en = endpoint_node(ep)
             nodes_by_id[en["id"]] = en
             key = (f"service:{service}", en["id"], "serves")
@@ -103,53 +110,9 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
                 "direction": "forward",
                 "weight": 1.0,
             }
-
-    def strip_gateway_prefix(path: str) -> str:
-        m = re.match(r"^/(stock|order|interface)(/.*)$", path)
-        return m.group(2) if m else path
-
-    for src in all_eps:
-        src_service = str(src.get("service", ""))
-        src_method = str(src.get("method", "UNKNOWN")).upper()
-        src_path = str(src.get("canonicalPath", ""))
-        if not src_path:
-            continue
-        src_paths = {src_path}
-        if "gateway" in src_service:
-            src_paths.add(strip_gateway_prefix(src_path))
-
-        for tgt in all_eps:
-            if src is tgt:
-                continue
-            tgt_service = str(tgt.get("service", ""))
-            if src_service == tgt_service:
-                continue
-            if "gateway" not in src_service and "gateway" not in tgt_service:
-                continue
-
-            tgt_method = str(tgt.get("method", "UNKNOWN")).upper()
-            tgt_path = str(tgt.get("canonicalPath", ""))
-            if not tgt_path:
-                continue
-
-            method_compatible = (
-                src_method == tgt_method
-                or src_method == "UNKNOWN"
-                or tgt_method == "UNKNOWN"
-            )
-            path_compatible = tgt_path in src_paths
-            if not method_compatible or not path_compatible:
-                continue
-
-            weight = 0.9 if src_method == tgt_method and src_method != "UNKNOWN" else 0.7
-            edge = {
-                "source": src["id"],
-                "target": tgt["id"],
-                "type": "routes",
-                "direction": "forward",
-                "weight": weight,
-            }
-            edges_by_key[(edge["source"], edge["target"], edge["type"])] = edge
+        for callout in leaf.get("callouts", []):
+            if isinstance(callout, dict):
+                all_callouts.append(callout)
 
     # Unresolved endpoint-level cross-service fallback:
     # mark likely order -> shipping integrations when endpoint-to-endpoint
@@ -184,8 +147,8 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
             }
             edges_by_key[(dep["source"], dep["target"], dep["type"])] = dep
 
-    # Fallback gateway -> service dependency mapping when exact endpoint
-    # pairing cannot be proven from leaf graphs.
+    # Gateway should stay at service level only in project endpoint view.
+    # Keep only service -> service dependencies for gateway prefixes.
     for ep in all_eps:
         service = str(ep.get("service", ""))
         if "gateway" not in service:
@@ -204,13 +167,150 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
         if svc_id not in nodes_by_id:
             nodes_by_id[svc_id] = service_node(downstream)
         dep_edge = {
-            "source": ep["id"],
+            "source": f"service:{service}",
             "target": svc_id,
             "type": "depends_on",
             "direction": "forward",
             "weight": 0.7,
         }
         edges_by_key[(dep_edge["source"], dep_edge["target"], dep_edge["type"])] = dep_edge
+
+    # Callout-driven mapping from leaf outbound calls (evidence-based):
+    # 1) create service->service dependency
+    # 2) create endpoint->endpoint routes when we can map source endpoint candidates
+    #    by method + semantic keyword against source service endpoints.
+    endpoints_by_service: dict[str, list[dict[str, Any]]] = {}
+    endpoints_by_source_node_id: dict[str, dict[str, Any]] = {}
+    for ep in all_eps:
+        svc = str(ep.get("service", ""))
+        endpoints_by_service.setdefault(svc, []).append(ep)
+        src_node_id = str(ep.get("sourceNodeId", "")).strip()
+        if src_node_id:
+            endpoints_by_source_node_id[src_node_id] = ep
+
+    endpoints_index: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for ep in all_eps:
+        m = str(ep.get("method", "UNKNOWN")).upper()
+        p = str(ep.get("canonicalPath", ""))
+        if not p:
+            continue
+        endpoints_index.setdefault((m, p), []).append(ep)
+        if m == "UNKNOWN":
+            endpoints_index.setdefault(("ANY", p), []).append(ep)
+
+    def infer_target_services_from_path(path: str) -> set[str]:
+        candidates: set[str] = set()
+        low = path.lower()
+        if "/activity" in low:
+            candidates.add("ms-activity")
+        if "shipping" in low or "/delivery" in low or "waybill" in low:
+            candidates.add("ms-shipping")
+        if "/stock" in low or "reservation" in low:
+            candidates.add("ms-stock")
+        if "/order" in low and "/interface/" in low:
+            candidates.add("ms-order")
+        return candidates
+
+    for co in all_callouts:
+        src_service = str(co.get("service", ""))
+        method = str(co.get("method", "UNKNOWN")).upper()
+        canonical = str(co.get("canonicalPath", ""))
+        if not src_service or not canonical:
+            continue
+
+        direct_candidates = endpoints_index.get((method, canonical), [])
+        if method == "UNKNOWN":
+            direct_candidates = endpoints_index.get(("ANY", canonical), [])
+        target_eps = [ep for ep in direct_candidates if str(ep.get("service", "")) != src_service]
+
+        if not target_eps:
+            inferred_services = infer_target_services_from_path(canonical)
+            target_eps = [
+                ep
+                for ep in all_eps
+                if str(ep.get("service", "")) in inferred_services
+                and str(ep.get("canonicalPath", "")) == canonical
+                and (method == "UNKNOWN" or str(ep.get("method", "UNKNOWN")).upper() in {method, "UNKNOWN"})
+            ]
+
+        if not target_eps:
+            continue
+
+        callout_actions = [str(a).strip() for a in co.get("businessActions", []) if str(a).strip()]
+
+        # Service dependencies
+        for tgt_ep in target_eps:
+            tgt_service = str(tgt_ep.get("service", ""))
+            if not tgt_service or tgt_service == src_service:
+                continue
+            s_edge = {
+                "source": f"service:{src_service}",
+                "target": f"service:{tgt_service}",
+                "type": "depends_on",
+                "direction": "forward",
+                "weight": 0.9,
+            }
+            if s_edge["source"] in nodes_by_id and s_edge["target"] in nodes_by_id:
+                edges_by_key[(s_edge["source"], s_edge["target"], s_edge["type"])] = s_edge
+
+        # Endpoint->endpoint routes: choose source endpoints within src service
+        # that best match the callout semantic keyword.
+        src_eps = endpoints_by_service.get(src_service, [])
+        fn_low = str(co.get("function", "")).lower()
+        keyword = ""
+        for token in ("quotation", "waybill", "order-to-ship", "activity", "delivery"):
+            if token in canonical.lower() or token in fn_low:
+                keyword = token
+                break
+        if not keyword and canonical:
+            keyword = canonical.rstrip("/").split("/")[-1]
+
+        source_candidates = []
+        source_endpoint_node_ids = [
+            str(v).strip()
+            for v in co.get("sourceEndpointNodeIds", [])
+            if str(v).strip()
+        ]
+        for src_node_id in source_endpoint_node_ids:
+            mapped = endpoints_by_source_node_id.get(src_node_id)
+            if mapped and str(mapped.get("service", "")) == src_service:
+                source_candidates.append(mapped)
+
+        if not source_candidates:
+            source_candidates = [
+                ep for ep in src_eps
+                if (method == "UNKNOWN" or str(ep.get("method", "UNKNOWN")).upper() in {method, "UNKNOWN"})
+                and (keyword.lower() in str(ep.get("canonicalPath", "")).lower())
+            ]
+
+        if not source_candidates:
+            continue
+
+        for src_ep in source_candidates:
+            for tgt_ep in target_eps:
+                if str(src_ep.get("service", "")) == str(tgt_ep.get("service", "")):
+                    continue
+                r_edge = {
+                    "source": str(src_ep.get("id", "")),
+                    "target": str(tgt_ep.get("id", "")),
+                    "type": "routes",
+                    "direction": "forward",
+                    "weight": 0.85,
+                }
+                if r_edge["source"] and r_edge["target"]:
+                    edges_by_key[(r_edge["source"], r_edge["target"], r_edge["type"])] = r_edge
+                    src_node = nodes_by_id.get(r_edge["source"])
+                    tgt_node = nodes_by_id.get(r_edge["target"])
+                    for node in (src_node, tgt_node):
+                        if not isinstance(node, dict):
+                            continue
+                        dm = node.get("domainMeta")
+                        if not isinstance(dm, dict):
+                            continue
+                        current = [str(a).strip() for a in dm.get("businessActions", []) if str(a).strip()]
+                        merged = sorted(set(current + callout_actions))
+                        dm["businessActions"] = merged
+                        dm["useCases"] = merged
 
     # Mark endpoint connectivity metadata from built connector edges.
     endpoint_connected_ids: set[str] = set()
