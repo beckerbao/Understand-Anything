@@ -127,6 +127,17 @@ function EndpointGraphViewInner() {
       // Focused: keep all services visible (dim unrelated), expand connectors for selected service.
       for (const service of allServices) visibleNodes.set(service.id, service);
       highlightNodeIds.add(activeServiceId);
+      for (const edge of edges) {
+        if (edge.type !== "depends_on") continue;
+        if (edge.source === activeServiceId && edge.target.startsWith("service:")) {
+          visibleEdges.push(edge);
+          const targetNode = nodeById.get(edge.target);
+          if (targetNode) {
+            visibleNodes.set(targetNode.id, targetNode);
+            highlightNodeIds.add(targetNode.id);
+          }
+        }
+      }
 
       // 1) Selected service -> served endpoints
       const servedEndpointIds = new Set<string>();
@@ -140,14 +151,17 @@ function EndpointGraphViewInner() {
         }
       }
 
-      // 2) For each served endpoint, collect direct connector edges + related service nodes
+      // 2) For each served endpoint, collect direct connector edges + related service nodes.
+      // Render only endpoints that have at least one visible cross-service connector:
+      // - `depends_on` OR
+      // - `routes` to another endpoint
+      const connectedServedEndpointIds = new Set<string>();
       for (const endpointId of servedEndpointIds) {
         const endpointNode = allEndpoints.find((n) => n.id === endpointId);
         if (!endpointNode) continue;
-        visibleNodes.set(endpointId, endpointNode);
-        highlightNodeIds.add(endpointId);
         const endpointMeta = (endpointNode.domainMeta ?? {}) as Record<string, unknown>;
         const endpointCanonical = normalizedProjectPath(String(endpointMeta.canonicalPath ?? endpointMeta.path ?? ""));
+        let endpointHasConnector = false;
 
         for (const edge of edges) {
           if (edge.source !== endpointId && edge.target !== endpointId) continue;
@@ -155,14 +169,9 @@ function EndpointGraphViewInner() {
           const otherNode = nodeById.get(otherId);
           if (!otherNode) continue;
 
-          // Keep endpoint connector edges and any link to a service.
-          if (
-            edge.type === "depends_on" ||
-            edge.type === "routes" ||
-            edge.type === "implements" ||
-            edge.type === "configures" ||
-            otherNode.type === "service"
-          ) {
+          const isEndpointRoute =
+            edge.type === "routes" && otherNode.type === "endpoint";
+          if (edge.type === "depends_on" || isEndpointRoute) {
             // Avoid duplicate visual endpoints when gateway-prefixed and backend
             // endpoints represent the same canonical business path.
             if (otherNode.type === "endpoint") {
@@ -173,10 +182,16 @@ function EndpointGraphViewInner() {
                 continue;
               }
             }
+            endpointHasConnector = true;
             visibleEdges.push(edge);
             visibleNodes.set(otherNode.id, otherNode);
             highlightNodeIds.add(otherNode.id);
           }
+        }
+        if (endpointHasConnector) {
+          connectedServedEndpointIds.add(endpointId);
+          visibleNodes.set(endpointId, endpointNode);
+          highlightNodeIds.add(endpointId);
         }
       }
     }

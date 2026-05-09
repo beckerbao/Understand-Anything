@@ -426,7 +426,8 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
 
     for g in graphs:
         proj = g.get("project", {})
-        project_name = proj.get("name", "") or project_name
+        if not project_name:
+            project_name = proj.get("name", "") or project_name
         for lang in proj.get("languages", []):
             if lang not in languages:
                 languages.append(lang)

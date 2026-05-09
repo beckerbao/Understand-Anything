@@ -83,6 +83,11 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    ```
    Run this in the background so the user can continue working.
 
+   Critical:
+   - Always pass project root via `GRAPH_DIR=<project-dir>`.
+   - Do NOT use `--project-root` or other custom CLI flags for graph selection.
+   - If `GRAPH_DIR` is missing, the dashboard may read the wrong graph and show metadata validation errors.
+
 6. **Capture the access token URL from the server output.** The Vite server prints a line like:
    ```
    🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
