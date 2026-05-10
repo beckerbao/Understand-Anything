@@ -1,0 +1,4 @@
+interface:
+  display_name: "Understand Project Pipeline"
+  short_description: "Orchestrate federated project-level knowledge and API mapping"
+  default_prompt: "Orchestrate the project-level Understand-Anything pipeline by federating leaf graphs, building canonical project knowledge, building project API mappings, and validating the final top-level artifacts."
