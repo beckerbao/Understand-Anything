@@ -44,6 +44,22 @@ def normalize_path(path: str) -> str:
     return p or "/"
 
 
+def canonicalize_outbound_path(path: str) -> str:
+    p = path.strip()
+    if not p:
+        return p
+    # Convert dynamic base URL expressions to routable path:
+    # ${BASE}/api/v1/x -> /api/v1/x
+    m = re.search(r"(/api/.*)$", p)
+    if m:
+        p = m.group(1)
+    elif p.startswith("http://") or p.startswith("https://"):
+        m2 = re.match(r"^https?://[^/]+(/.*)$", p)
+        if m2:
+            p = m2.group(1)
+    return normalize_path(p)
+
+
 def unique_keep_order(values: list[str]) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -144,6 +160,11 @@ def extract_endpoint_nodes(graph: dict[str, Any], repo_root: Path) -> list[dict[
 
 def extract_callouts(graph: dict[str, Any], repo_root: Path) -> list[dict[str, Any]]:
     nodes = [n for n in graph.get("nodes", []) if isinstance(n, dict)]
+    nodes_by_id: dict[str, dict[str, Any]] = {}
+    for n in nodes:
+        nid = str(n.get("id", "")).strip()
+        if nid:
+            nodes_by_id[nid] = n
     edges = [e for e in graph.get("edges", []) if isinstance(e, dict)]
     endpoint_to_functions: dict[str, set[str]] = {}
     function_to_callouts: dict[str, set[str]] = {}
@@ -152,17 +173,29 @@ def extract_callouts(graph: dict[str, Any], repo_root: Path) -> list[dict[str, A
         tgt = str(edge.get("target", "")).strip()
         if src.startswith("endpoint:") and tgt.startswith("function:"):
             endpoint_to_functions.setdefault(src, set()).add(tgt)
-        if src.startswith("function:") and tgt.startswith("callout:"):
+        if src.startswith("function:") and (
+            tgt.startswith("callout:")
+            or (
+                tgt.startswith("endpoint:")
+                and (
+                    (isinstance(nodes_by_id.get(tgt, {}).get("tags"), list) and "outbound" in nodes_by_id.get(tgt, {}).get("tags", []))
+                    or "callout" in str(nodes_by_id.get(tgt, {}).get("summary", "")).lower()
+                )
+            )
+        ):
             function_to_callouts.setdefault(tgt, set()).add(src)
 
     out: list[dict[str, Any]] = []
     for node in nodes:
         node_type = str(node.get("type", "")).strip()
         node_id = str(node.get("id", "")).strip()
+        tags = node.get("tags", []) if isinstance(node.get("tags"), list) else []
+        is_outbound_endpoint = node_type == "endpoint" and ("outbound" in tags or "callout" in str(node.get("summary", "")).lower())
         # Backward compatible:
         # - legacy leaf graphs: type == callout
         # - normalized leaf graphs: type == endpoint with id prefix callout:
-        if node_type != "callout" and not (node_type == "endpoint" and node_id.startswith("callout:")):
+        # - shipping-like graphs: type == endpoint with outbound tag/summary
+        if node_type != "callout" and not (node_type == "endpoint" and node_id.startswith("callout:")) and not is_outbound_endpoint:
             continue
         meta = node.get("meta", {}) if isinstance(node.get("meta"), dict) else {}
         method = "UNKNOWN"
@@ -174,6 +207,9 @@ def extract_callouts(graph: dict[str, Any], repo_root: Path) -> list[dict[str, A
             if not path:
                 path = m.group(2).strip()
         if not path:
+            continue
+        path = canonicalize_outbound_path(path)
+        if not path.startswith("/"):
             continue
         caller_functions = sorted(function_to_callouts.get(node_id, set()))
         source_endpoint_node_ids: set[str] = set()
@@ -193,6 +229,7 @@ def extract_callouts(graph: dict[str, Any], repo_root: Path) -> list[dict[str, A
                 "function": str(meta.get("function", "")).strip(),
                 "filePath": node.get("filePath"),
                 "summary": str(node.get("summary", "")).strip(),
+                "tags": tags,
                 "businessActions": infer_business_actions(f"{name} {path} {meta.get('function', '')}"),
                 "callerFunctions": caller_functions,
                 "sourceEndpointNodeIds": sorted(source_endpoint_node_ids),

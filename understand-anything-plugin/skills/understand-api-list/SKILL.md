@@ -29,7 +29,11 @@ Supported runtime/language scope:
    - Frontend JS/TS: `fetch`, `axios`, Apollo/graphql-request style call-sites
 5. Persist outbound artifact to `.understand-anything/api-callout-list.json`.
 6. Merge call-outs into `.understand-anything/knowledge-graph.json` as `callout` nodes and edges.
-7. Validate JSON before finishing.
+7. Enforce endpoint traceability chain for each routed inbound endpoint:
+   - `endpoint:<route>` -> `function:<handler/controller>` (`calls`)
+   - `function:<handler/controller>` -> `function:<service/helper>` (`calls`, when present)
+   - `function:<...>` -> `callout/outbound-endpoint` (`calls`)
+8. Validate JSON before finishing.
 
 ## Runtime Commands (Recommended)
 
@@ -75,10 +79,16 @@ For `endpoint` nodes that represent outbound call-outs (legacy compatibility mod
 
 - `contains`: file node -> endpoint/callout node
 - `calls`: function node -> endpoint/callout node (when function node exists)
+- `calls`: endpoint(route) node -> handler/controller function node (required for endpoint-level impact)
+- `calls`: handler/controller/service function -> outbound callout node (required for project API mapping)
 
 ## Output Rules
 
 - Keep inbound and outbound separated by node type (`endpoint` vs `callout`).
+- For legacy/normalized outbound-as-endpoint nodes, preserve outbound semantics in metadata and tags:
+  - keep `outbound` tag
+  - keep `target_base`/`target_path` when inferable
+  - prefer stable `callout:*` id when possible
 - Keep IDs stable across reruns.
 - Prefer runtime route definitions over docs when conflicting.
 - For dynamic URLs, keep expression-level target instead of fabricating concrete URL.

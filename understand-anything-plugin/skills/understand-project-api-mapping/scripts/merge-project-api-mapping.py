@@ -211,6 +211,27 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
             candidates.add("ms-order")
         return candidates
 
+    def infer_target_services_from_callout(co: dict[str, Any]) -> set[str]:
+        inferred = infer_target_services_from_path(str(co.get("canonicalPath", "")))
+        text = " ".join(
+            [
+                str(co.get("id", "")),
+                str(co.get("summary", "")),
+                str(co.get("path", "")),
+                str(co.get("function", "")),
+                " ".join([str(t) for t in co.get("tags", []) if str(t).strip()]),
+            ]
+        ).lower()
+        if "shop" in text:
+            inferred.add("ms-shop")
+        if "catalog" in text:
+            inferred.add("ms-catalog")
+        if "grab" in text:
+            inferred.add("external-grab")
+        if "ali" in text:
+            inferred.add("external-ali")
+        return inferred
+
     for co in all_callouts:
         src_service = str(co.get("service", ""))
         method = str(co.get("method", "UNKNOWN")).upper()
@@ -223,8 +244,8 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
             direct_candidates = endpoints_index.get(("ANY", canonical), [])
         target_eps = [ep for ep in direct_candidates if str(ep.get("service", "")) != src_service]
 
+        inferred_services = infer_target_services_from_callout(co)
         if not target_eps:
-            inferred_services = infer_target_services_from_path(canonical)
             target_eps = [
                 ep
                 for ep in all_eps
@@ -233,12 +254,26 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
                 and (method == "UNKNOWN" or str(ep.get("method", "UNKNOWN")).upper() in {method, "UNKNOWN"})
             ]
 
-        if not target_eps:
-            continue
-
         callout_actions = [str(a).strip() for a in co.get("businessActions", []) if str(a).strip()]
 
         # Service dependencies
+        if not target_eps:
+            for tgt_service in inferred_services:
+                if not tgt_service or tgt_service == src_service:
+                    continue
+                tgt_service_id = f"service:{tgt_service}"
+                if tgt_service_id not in nodes_by_id:
+                    nodes_by_id[tgt_service_id] = service_node(tgt_service)
+                s_edge = {
+                    "source": f"service:{src_service}",
+                    "target": tgt_service_id,
+                    "type": "depends_on",
+                    "direction": "forward",
+                    "weight": 0.6,
+                }
+                edges_by_key[(s_edge["source"], s_edge["target"], s_edge["type"])] = s_edge
+            continue
+
         for tgt_ep in target_eps:
             tgt_service = str(tgt_ep.get("service", ""))
             if not tgt_service or tgt_service == src_service:
