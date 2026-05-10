@@ -1,0 +1,1 @@
+/Users/minhbaonguyen/Downloads/amaze/ms/ms-stock/ms-stock/.understand-anything/scripts/generate_validation_index.js

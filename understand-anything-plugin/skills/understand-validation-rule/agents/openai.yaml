@@ -1,0 +1,7 @@
+interface:
+  display_name: "Understand Validation Rule"
+  short_description: "Extract route and input contracts"
+  default_prompt: "Use $understand-validation-rule to extract route-first input contracts, defaults, and validation rules for selected endpoints and functions."
+
+policy:
+  allow_implicit_invocation: true
