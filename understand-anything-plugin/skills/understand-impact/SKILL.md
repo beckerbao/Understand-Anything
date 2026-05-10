@@ -1,7 +1,7 @@
 ---
 name: understand-impact
 description: Analyze a structural knowledge graph to compute upstream/downstream call-chain impact for a seed node or changed file, then write an impact overlay for dashboard and agent use.
-argument-hint: [node-or-file-path [--max-hops N] [--upstream|--downstream|--both]]
+argument-hint: "[node-or-file-path [--max-hops N] [--upstream|--downstream|--both]]"
 ---
 
 # /understand-impact
