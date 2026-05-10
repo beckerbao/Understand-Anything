@@ -51,8 +51,13 @@ This skill does not run `/understand` for leaf repos.
      2) direct `method + canonicalPath` endpoint match
      3) heuristic keyword fallback (only when evidence is missing)
 4. Score mappings with confidence (`high`, `medium`, `low`).
-5. Keep only evidence-backed mappings; mark uncertain ones unresolved.
-6. Merge and validate final `endpoint-graph.json`.
+5. **Agent Verification (ZERO TOLERANCE MANDATE):**
+   - Agent MUST review all mappings with inference_type: keyword, inference_type: ambiguous_match, or weight <= 0.2.
+   - **AMBIGUITY RESOLUTION:** If one callout matches multiple target services, you MUST inspect the source to determine the correct target.
+   - **PROHIBITED:** YOU MUST NOT LEAVE ANY EDGE WITH WEIGHT <= 0.2 IN THE FINAL endpoint-graph.json. YOU MUST EITHER VERIFY AND PROMOTE IT TO 0.9 OR DELETE IT. NO EXCEPTIONS.
+   - **ACTION:** Remove false positives or unverified edges entirely. A clean graph is better than a noisy one.
+6. Keep only evidence-backed or agent-verified mappings; mark uncertain ones unresolved.
+7. Merge and validate final `endpoint-graph.json`.
 7. Propagate `businessActions/useCases` from leaf endpoint/callout semantics into project endpoint nodes for impact analysis.
 8. Mark endpoint visibility metadata:
    - `crossServiceConnected=true` when endpoint has cross-service connector evidence

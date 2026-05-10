@@ -140,10 +140,7 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
                 continue
             dep = {
                 "source": ep_id,
-                "target": "service:ms-shipping",
-                "type": "depends_on",
-                "direction": "forward",
-                "weight": 0.45,
+                "target": "service:ms-shipping", "type": "depends_on", "direction": "forward", "weight": 0.1, "inference_type": "keyword",
             }
             edges_by_key[(dep["source"], dep["target"], dep["type"])] = dep
 
@@ -228,7 +225,7 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
             inferred.add("ms-catalog")
         if "grab" in text:
             inferred.add("external-grab")
-        if "ali" in text:
+        if re.search(r"\b(ali|ali-express|alipay)\b", text):
             inferred.add("external-ali")
         return inferred
 
@@ -269,22 +266,32 @@ def build_graph(project_root: Path, context: dict[str, Any]) -> dict[str, Any]:
                     "target": tgt_service_id,
                     "type": "depends_on",
                     "direction": "forward",
-                    "weight": 0.6,
+                    "weight": 0.1,
+                    "inference_type": "keyword",
                 }
                 edges_by_key[(s_edge["source"], s_edge["target"], s_edge["type"])] = s_edge
             continue
+
+        # Ambiguity check: if multiple services share the same endpoint signature, 
+        # lower the weight to force agent verification.
+        unique_target_services = set(str(ep.get("service", "")) for ep in target_eps if str(ep.get("service", "")) != src_service)
+        is_ambiguous = len(unique_target_services) > 1
 
         for tgt_ep in target_eps:
             tgt_service = str(tgt_ep.get("service", ""))
             if not tgt_service or tgt_service == src_service:
                 continue
+            
+            weight = 0.9 if not is_ambiguous else 0.2
             s_edge = {
                 "source": f"service:{src_service}",
                 "target": f"service:{tgt_service}",
                 "type": "depends_on",
                 "direction": "forward",
-                "weight": 0.9,
+                "weight": weight,
             }
+            if is_ambiguous:
+                s_edge["inference_type"] = "ambiguous_match
             if s_edge["source"] in nodes_by_id and s_edge["target"] in nodes_by_id:
                 edges_by_key[(s_edge["source"], s_edge["target"], s_edge["type"])] = s_edge
 
